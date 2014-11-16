@@ -28,11 +28,13 @@ enum
 };
 
 #define SWIZZLE_COMP(n,v) ((v) << (6-(n)*2))
-#define OPDESC_MAKE(out, src1, src2) ((out) | ((src1) << 5) | ((src2) << (5+8+1)))
+#define OPSRC_MAKE(neg, sw) ((neg) | ((sw) << 1))
+#define OPDESC_MAKE(out, src1, src2) ((out) | ((src1) << 4) | ((src2) << (4+9)))
 #define FMT_OPCODE(n) ((n)<<26)
 #define OUTPUT_MAKE(i, reg, mask) ((i) | ((reg)<<16) | ((u64)(mask)<<32))
 
 #define DEFAULT_SWIZZLE (SWIZZLE_COMP(0,COMP_X) | SWIZZLE_COMP(1,COMP_Y) | SWIZZLE_COMP(2,COMP_Z) | SWIZZLE_COMP(3,COMP_W))
+#define DEFAULT_OPSRC OPSRC_MAKE(0, DEFAULT_SWIZZLE)
 
 extern std::vector<u32> g_outputBuf;
 

@@ -341,11 +341,12 @@ static int parseSwizzling(const char* b)
 	// Fill in missing bits
 	for (int j = i; j < 4; j ++)
 		out |= SWIZZLE_COMP(j, q);
-	return out;
+	return out<<1;
 }
 
 static int maskFromSwizzling(int sw)
 {
+	sw >>= 1; // get rid of negation bit
 	int out = 0;
 	for (int i = 0; i < 4; i ++)
 		out |= BIT(3-((sw>>(i*2))&3));
@@ -358,15 +359,15 @@ static int findOrAddOpdesc(int& out, int opdesc, bool ignoreOp2=false)
 	{
 		int cur_opdesc = g_opdescTable[i];
 		if (ignoreOp2)
-			cur_opdesc &= ~((0xFF << (5+8+1)) | BIT(31)); // clear bits we don't want to compare
+			cur_opdesc &= ~((0x1FF << (4+9)) | BIT(31)); // clear bits we don't want to compare
 		else if (cur_opdesc & BIT(31))
 		{
 			// We can recycle this opdesc which didn't have an explicit Op2
 			cur_opdesc &= ~BIT(31);
-			int cmp = opdesc &~ (0xFF << (5+8+1)); // partial opdesc used for comparison
+			int cmp = opdesc &~ (0x1FF << (4+9)); // partial opdesc used for comparison
 			if (cmp == cur_opdesc)
 			{
-				g_opdescTable[i] = cur_opdesc | (opdesc & (0xFF << (5+8+1)));
+				g_opdescTable[i] = cur_opdesc | (opdesc & (0x1FF << (4+9)));
 				out = i;
 				return 0;
 			}
@@ -395,12 +396,17 @@ static inline bool isregp(int x)
 static int parseReg(char* pos, int& outReg, int& outSw)
 {
 	outReg = 0;
-	outSw = DEFAULT_SWIZZLE;
+	outSw = DEFAULT_OPSRC;
+	if (*pos == '-')
+	{
+		pos++;
+		outSw |= 1; // negation bit
+	}
 	auto dotPos = strchr(pos, '.');
 	if (dotPos)
 	{
 		*dotPos++ = 0;
-		outSw = parseSwizzling(dotPos);
+		outSw = parseSwizzling(dotPos) | (outSw&1);
 		if (outSw < 0)
 			return throwError("invalid swizzling mask: %s\n", dotPos);
 	}
@@ -425,14 +431,15 @@ static int parseReg(char* pos, int& outReg, int& outSw)
 		int x = it->second;
 		outReg = x & 0xFF;
 		outReg += regOffset;
-		x >>= 8;
+		outSw ^= (x>>8)&1;
+		x >>= 9;
 		// Combine swizzling
-		int temp = 0;
+		int temp = outSw & 1;
 		for (int j = 0; j < 4; j ++)
 		{
-			int comp = (outSw >> (6 - j*2)) & 3;
+			int comp = (outSw >> (7 - j*2)) & 3;
 			comp = (x >> (6 - comp*2)) & 3;
-			temp |= SWIZZLE_COMP(j, comp);
+			temp |= SWIZZLE_COMP(j, comp)<<1;
 		}
 		outSw = temp;
 		return 0;
@@ -638,7 +645,7 @@ DEF_DIRECTIVE(uniform)
 		uniform.pos = uniformPos;
 		uniform.size = uSize;
 		uniformPos += uSize;
-		g_aliases.insert( std::pair<std::string,int>(argText, uniform.pos | (DEFAULT_SWIZZLE<<8)) );
+		g_aliases.insert( std::pair<std::string,int>(argText, uniform.pos | (DEFAULT_OPSRC<<8)) );
 
 #ifdef DEBUG
 		printf("uniform %s[%d] @ d%02X:d%02X\n", argText, uSize, uniform.pos, uniform.pos+uSize-1);
@@ -673,7 +680,7 @@ DEF_DIRECTIVE(const)
 	ct.param[2] = atof(arg2Text);
 	ct.param[3] = atof(arg3Text);
 
-	g_aliases.insert( std::pair<std::string,int>(constName, ct.regId | (DEFAULT_SWIZZLE<<8)) );
+	g_aliases.insert( std::pair<std::string,int>(constName, ct.regId | (DEFAULT_OPSRC<<8)) );
 
 #ifdef DEBUG
 	printf("constant %s(%f, %f, %f, %f) @ d%02X\n", constName, ct.param[0], ct.param[1], ct.param[2], ct.param[3], ct.regId);
@@ -705,7 +712,7 @@ DEF_DIRECTIVE(out)
 	if (!validateIdentifier(outName))
 		return throwError("invalid identifier: %s\n", outName);
 
-	int sw = DEFAULT_SWIZZLE;
+	int sw = DEFAULT_OPSRC;
 	auto dotPos = strchr(outType, '.');
 	if (dotPos)
 	{
