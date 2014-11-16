@@ -1,5 +1,6 @@
 #include "picasso.h"
 
+//#define DEBUG
 #define BUF g_outputBuf
 #define NO_MORE_STACK (g_stackPos==MAX_STACK)
 
@@ -13,6 +14,7 @@ int g_stackPos;
 
 int g_opdescTable[MAX_OPDESC];
 int g_opdescCount;
+int g_opdescMasks[MAX_OPDESC];
 
 Uniform g_uniformTable[MAX_UNIFORM];
 int g_uniformCount;
@@ -184,9 +186,6 @@ int AssembleString(char* str, const char* initialFilename)
 	if (g_stackPos)
 		return throwError("unclosed block(s)\n");
 
-	for (int i = 0; i < g_opdescCount; i ++)
-		g_opdescTable[i] &= ~BIT(31);
-
 	//safe_call(FixupRelocations());
 	
 	return 0;
@@ -353,36 +352,24 @@ static int maskFromSwizzling(int sw)
 	return out;
 }
 
-static int findOrAddOpdesc(int& out, int opdesc, bool ignoreOp2=false)
+static int findOrAddOpdesc(int& out, int opdesc, int mask = OPDESC_MASK_ALL)
 {
 	for (int i = 0; i < g_opdescCount; i ++)
 	{
-		int cur_opdesc = g_opdescTable[i];
-		if (ignoreOp2)
-			cur_opdesc &= ~((0x1FF << (4+9)) | BIT(31)); // clear bits we don't want to compare
-		else if (cur_opdesc & BIT(31))
+		int minMask = mask & g_opdescMasks[i];
+		if ((opdesc&minMask) == (g_opdescTable[i]&minMask))
 		{
-			// We can recycle this opdesc which didn't have an explicit Op2
-			cur_opdesc &= ~BIT(31);
-			int cmp = opdesc &~ (0x1FF << (4+9)); // partial opdesc used for comparison
-			if (cmp == cur_opdesc)
-			{
-				g_opdescTable[i] = cur_opdesc | (opdesc & (0x1FF << (4+9)));
-				out = i;
-				return 0;
-			}
-		}
-		if (opdesc == cur_opdesc)
-		{
+			// Save extra bits, if any
+			g_opdescTable[i] |= opdesc & (mask^minMask);
+			g_opdescMasks[i] |= mask;
 			out = i;
 			return 0;
 		}
 	}
 	if (g_opdescCount == MAX_OPDESC)
 		return throwError("too many operand descriptors (limit is %d)\n", MAX_OPDESC);
-	if (ignoreOp2)
-		opdesc |= BIT(31); // will be removed
 	g_opdescTable[g_opdescCount] = opdesc;
+	g_opdescMasks[g_opdescCount] = mask;
 	out = g_opdescCount++;
 	return 0;
 }
@@ -511,7 +498,7 @@ DEF_COMMAND(format2)
 	ARG_TO_SRC1_REG(rSrc1, src1Name);
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, 0), true));
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, 0), OPDESC_MASK_NOSRC2));
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, opdesc);

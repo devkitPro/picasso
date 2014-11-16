@@ -36,6 +36,10 @@ enum
 #define DEFAULT_SWIZZLE (SWIZZLE_COMP(0,COMP_X) | SWIZZLE_COMP(1,COMP_Y) | SWIZZLE_COMP(2,COMP_Z) | SWIZZLE_COMP(3,COMP_W))
 #define DEFAULT_OPSRC OPSRC_MAKE(0, DEFAULT_SWIZZLE)
 
+#define OPDESC_MASK_ALL      OPDESC_MAKE(0xF, 0x1FF, 0x1FF)
+#define OPDESC_MASK_NOSRC2   OPDESC_MAKE(0xF, 0x1FF, 0)
+#define OPDESC_MASK_ONLYSRC1 OPDESC_MAKE(0,   0x1FF, 0)
+
 extern std::vector<u32> g_outputBuf;
 
 enum
@@ -62,6 +66,7 @@ extern int g_stackPos;
 
 #define MAX_OPDESC 128
 extern int g_opdescTable[MAX_OPDESC];
+extern int g_opdeskMasks[MAX_OPDESC]; // used to keep track of used bits
 extern int g_opdescCount;
 
 struct Uniform
