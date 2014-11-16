@@ -260,7 +260,12 @@ typedef struct
 
 static int ensureNoMoreArgs()
 {
-	return nextArg() ? throwError("too many parameters") : 0;
+	return nextArg() ? throwError("too many parameters\n") : 0;
+}
+
+static int duplicateIdentifier(const char* id)
+{
+	return throwError("identifier already used: %s\n", id);
 }
 
 /*
@@ -524,6 +529,9 @@ DEF_COMMAND(format3)
 	int opdesc = 0;
 	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
 
+	if (opdesc >= 32)
+		return throwError("opdesc allocation error\n");
+
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
 #endif
@@ -617,7 +625,7 @@ DEF_DIRECTIVE(alias)
 	ARG_TO_REG(rAlias, aliasReg);
 
 	if (g_aliases.find(aliasName) != g_aliases.end())
-		return throwError("identifier already used: %s\n", aliasName);
+		return duplicateIdentifier(aliasName);
 
 	g_aliases.insert( std::pair<std::string,int>(aliasName, rAlias | (rAliasSw<<8)) );
 	return 0;
@@ -651,7 +659,7 @@ DEF_DIRECTIVE(uniform)
 		if (g_uniformCount == MAX_UNIFORM)
 			return throwError("too many uniforms: %s[%d]\n", argText, uSize);
 		if (g_aliases.find(argText) != g_aliases.end())
-			return throwError("identifier already used: %s\n", argText);
+			return duplicateIdentifier(argText);
 
 		auto& uniform = g_uniformTable[g_uniformCount++];
 		uniform.name = argText;
@@ -684,7 +692,7 @@ DEF_DIRECTIVE(const)
 		return throwError("not enough space for constant\n");
 
 	if (g_aliases.find(constName) != g_aliases.end())
-		return throwError("identifier already used: %s\n", constName);
+		return duplicateIdentifier(constName);
 
 	auto& ct = g_constantTable[g_constantCount++];
 	ct.regId = uniformPos++;
@@ -743,7 +751,7 @@ DEF_DIRECTIVE(out)
 		return throwError("too many outputs\n");
 
 	if (g_aliases.find(outName) != g_aliases.end())
-		return throwError("identifier already used: %s\n", outName);
+		return duplicateIdentifier(outName);
 
 	int oid = g_outputCount;
 
