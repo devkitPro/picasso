@@ -352,7 +352,7 @@ static int maskFromSwizzling(int sw)
 	return out;
 }
 
-static int findOrAddOpdesc(int& out, int opdesc, int mask = OPDESC_MASK_ALL)
+static int findOrAddOpdesc(int& out, int opdesc, int mask)
 {
 	for (int i = 0; i < g_opdescCount; i ++)
 	{
@@ -478,7 +478,7 @@ DEF_COMMAND(format1)
 	ARG_TO_SRC2_REG(rSrc2, src2Name);
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw)));
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_D12));
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, opdesc);
@@ -498,12 +498,36 @@ DEF_COMMAND(format2)
 	ARG_TO_SRC1_REG(rSrc1, src1Name);
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, 0), OPDESC_MASK_NOSRC2));
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, 0, 0), OPDESC_MASK_D1));
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, opdesc);
 #endif
 	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc1<<12) | (rDest<<21));
+
+	return 0;
+}
+
+DEF_COMMAND(format3)
+{
+	NEXT_ARG(destName);
+	NEXT_ARG(src1Name);
+	NEXT_ARG(src2Name);
+	NEXT_ARG(src3Name);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TO_DEST_REG(rDest, destName);
+	ARG_TO_SRC1_REG(rSrc1, src1Name);
+	ARG_TO_SRC2_REG(rSrc2, src2Name);
+	ARG_TO_SRC1_REG(rSrc3, src3Name);
+
+	int opdesc = 0;
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
+
+#ifdef DEBUG
+	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
+#endif
+	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc2<<5) | (rSrc1<<10) | (rSrc3<<17) | (rDest<<24));
 
 	return 0;
 }
@@ -523,6 +547,8 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(RCP, format2),
 	DEC_COMMAND(RSQ, format2),
 	DEC_COMMAND(MOV, format2),
+
+	DEC_COMMAND(MAD, format3),
 
 	{ nullptr, nullptr },
 };

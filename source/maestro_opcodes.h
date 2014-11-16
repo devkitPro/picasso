@@ -28,4 +28,6 @@ enum
 
 	MAESTRO_CMP = 0x2E,
 	MAESTRO_CMP2, // ???
+
+	MAESTRO_MAD = 0x38, // only the upper 3 bits are used for the opcode
 };

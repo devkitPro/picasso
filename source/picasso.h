@@ -29,16 +29,17 @@ enum
 
 #define SWIZZLE_COMP(n,v) ((v) << (6-(n)*2))
 #define OPSRC_MAKE(neg, sw) ((neg) | ((sw) << 1))
-#define OPDESC_MAKE(out, src1, src2) ((out) | ((src1) << 4) | ((src2) << (4+9)))
+#define OPDESC_MAKE(out, src1, src2, src3) ((out) | ((src1) << 4) | ((src2) << (4+9)) | ((src3) << (4+9*2)))
 #define FMT_OPCODE(n) ((n)<<26)
 #define OUTPUT_MAKE(i, reg, mask) ((i) | ((reg)<<16) | ((u64)(mask)<<32))
 
 #define DEFAULT_SWIZZLE (SWIZZLE_COMP(0,COMP_X) | SWIZZLE_COMP(1,COMP_Y) | SWIZZLE_COMP(2,COMP_Z) | SWIZZLE_COMP(3,COMP_W))
 #define DEFAULT_OPSRC OPSRC_MAKE(0, DEFAULT_SWIZZLE)
 
-#define OPDESC_MASK_ALL      OPDESC_MAKE(0xF, 0x1FF, 0x1FF)
-#define OPDESC_MASK_NOSRC2   OPDESC_MAKE(0xF, 0x1FF, 0)
-#define OPDESC_MASK_ONLYSRC1 OPDESC_MAKE(0,   0x1FF, 0)
+#define OPDESC_MASK_D123 OPDESC_MAKE(0xF, 0x1FF, 0x1FF, 0x1FF)
+#define OPDESC_MASK_D12  OPDESC_MAKE(0xF, 0x1FF, 0x1FF, 0)
+#define OPDESC_MASK_D1   OPDESC_MAKE(0xF, 0x1FF, 0,     0)
+#define OPDESC_MASK_1    OPDESC_MAKE(0,   0x1FF, 0,     0)
 
 extern std::vector<u32> g_outputBuf;
 
