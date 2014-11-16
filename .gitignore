@@ -1,0 +1,8 @@
+*.exe
+*.o
+*.elf
+*~
+*.shbin
+*.vsh.h
+*.bat
+build/
