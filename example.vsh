@@ -2,7 +2,7 @@
 ; Also serves as an example of picasso syntax
 
 ; Uniforms
-.uniform projMtx(4), mdlvMtx(4)
+.uniform projMtx[4], mdlvMtx[4]
 
 ; Constants
 .const myconst(0.0, 1.0, -1.0, 0.0)
@@ -29,16 +29,16 @@
 	mov r0.w, ones
 	
 	; r1 = mdlvMtx * r0
-	dp4 r1.x, mdlvMtx(0), r0
-	dp4 r1.y, mdlvMtx(1), r0
-	dp4 r1.z, mdlvMtx(2), r0
-	dp4 r1.w, mdlvMtx(3), r0
+	dp4 r1.x, mdlvMtx[0], r0
+	dp4 r1.y, mdlvMtx[1], r0
+	dp4 r1.z, mdlvMtx[2], r0
+	dp4 r1.w, mdlvMtx[3], r0
 	
 	; outpos = projMtx * r1
-	dp4 outpos.x, projMtx(0), r1
-	dp4 outpos.y, projMtx(1), r1
-	dp4 outpos.z, projMtx(2), r1
-	dp4 outpos.w, projMtx(3), r1
+	dp4 outpos.x, projMtx[0], r1
+	dp4 outpos.y, projMtx[1], r1
+	dp4 outpos.z, projMtx[2], r1
+	dp4 outpos.w, projMtx[3], r1
 	
 	; Set texcoords
 	mov outtc0, intex

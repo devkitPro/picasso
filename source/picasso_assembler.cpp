@@ -386,6 +386,12 @@ static int findOrAddOpdesc(int& out, int opdesc, bool ignoreOp2=false)
 	return 0;
 }
 
+static inline bool isregp(int x)
+{
+	x = tolower(x);
+	return x=='o' || x=='v' || x=='r' || x=='c';
+}
+
 static int parseReg(char* pos, int& outReg, int& outSw)
 {
 	outReg = 0;
@@ -399,19 +405,19 @@ static int parseReg(char* pos, int& outReg, int& outSw)
 			return throwError("invalid swizzling mask: %s\n", dotPos);
 	}
 	int regOffset = 0;
-	auto parenPos = strchr(pos, '(');
-	if (parenPos)
+	auto offPos = strchr(pos, '[');
+	if (offPos)
 	{
-		auto closePos = strchr(parenPos, ')');
+		auto closePos = strchr(offPos, ']');
 		if (!closePos)
-			return throwError("missing close paren: %s\n", pos);
+			return throwError("missing closing bracket: %s\n", pos);
 		*closePos = 0;
-		*parenPos++ = 0;
-		parenPos = trim_whitespace(parenPos);
+		*offPos++ = 0;
+		offPos = trim_whitespace(offPos);
 		// TODO: support (idx1[+n]), (idx2[+n]), (lcnt[+n])
-		regOffset = atoi(parenPos);
+		regOffset = atoi(offPos);
 		if (regOffset < 0)
-			return throwError("invalid register offset: %s\n", parenPos);
+			return throwError("invalid register offset: %s\n", offPos);
 	}
 	auto it = g_aliases.find(pos);
 	if (it != g_aliases.end())
@@ -432,6 +438,9 @@ static int parseReg(char* pos, int& outReg, int& outSw)
 		return 0;
 	}
 
+	if (!isregp(pos[0]) || !isdigit(pos[1]))
+		return throwError("invalid register: %s\n", pos);
+
 	safe_call(parseInt(pos+1, outReg, 0, 255));
 	switch (*pos)
 	{
@@ -450,8 +459,6 @@ static int parseReg(char* pos, int& outReg, int& outSw)
 			if (outReg < 0x20 || outReg >= 0x80)
 				return throwError("invalid vector uniform register: %s(%d)\n", pos);
 			break;
-		default:
-			return throwError("invalid register: %s\n", pos);
 	}
 	outReg += regOffset;
 	return 0;
@@ -577,12 +584,6 @@ DEF_DIRECTIVE(end)
 	return 0;
 }
 
-static inline bool isregp(int x)
-{
-	x = tolower(x);
-	return x=='o' || x=='v' || x=='r' || x=='c';
-}
-
 DEF_DIRECTIVE(alias)
 {
 	NEXT_ARG_SPC(aliasName);
@@ -610,25 +611,25 @@ DEF_DIRECTIVE(uniform)
 		if (!argText) break;
 
 		int uSize = 1;
-		char* parenPos = strchr(argText, '(');
-		if (parenPos)
+		char* sizePos = strchr(argText, '[');
+		if (sizePos)
 		{
-			char* closePos = strchr(parenPos, ')');
+			char* closePos = strchr(sizePos, ']');
 			if (!closePos)
-				return throwError("missing close paren: %s\n", argText);
+				return throwError("missing closing bracket: %s\n", argText);
 			*closePos = 0;
-			*parenPos++ = 0;
-			parenPos = trim_whitespace(parenPos);
-			uSize = atoi(parenPos);
+			*sizePos++ = 0;
+			sizePos = trim_whitespace(sizePos);
+			uSize = atoi(sizePos);
 			if (uSize < 1)
-				return throwError("invalid uniform size: %s(%s)\n", argText, parenPos);
+				return throwError("invalid uniform size: %s[%s]\n", argText, sizePos);
 		}
 		if (!validateIdentifier(argText))
 			return throwError("invalid uniform name: %s\n", argText);
 		if ((uniformPos+uSize) >= 0x80)
-			return throwError("not enough uniform registers: %s(%d)\n", argText, uSize);
+			return throwError("not enough uniform registers: %s[%d]\n", argText, uSize);
 		if (g_uniformCount == MAX_UNIFORM)
-			return throwError("too many uniforms: %s(%d)\n", argText, uSize);
+			return throwError("too many uniforms: %s[%d]\n", argText, uSize);
 		if (g_aliases.find(argText) != g_aliases.end())
 			return throwError("identifier already used: %s\n", argText);
 
@@ -640,7 +641,7 @@ DEF_DIRECTIVE(uniform)
 		g_aliases.insert( std::pair<std::string,int>(argText, uniform.pos | (DEFAULT_SWIZZLE<<8)) );
 
 #ifdef DEBUG
-		printf("uniform %s(%d) @ d%02X:d%02X\n", argText, uSize, uniform.pos, uniform.pos+uSize-1);
+		printf("uniform %s[%d] @ d%02X:d%02X\n", argText, uSize, uniform.pos, uniform.pos+uSize-1);
 #endif
 	}
 	return 0;
