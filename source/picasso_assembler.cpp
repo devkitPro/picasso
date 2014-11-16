@@ -523,8 +523,8 @@ DEF_COMMAND(format3)
 
 	ARG_TO_DEST_REG(rDest, destName);
 	ARG_TO_SRC1_REG(rSrc1, src1Name);
-	ARG_TO_SRC2_REG(rSrc2, src2Name);
-	ARG_TO_SRC1_REG(rSrc3, src3Name);
+	ARG_TO_SRC1_REG(rSrc2, src2Name);
+	ARG_TO_SRC2_REG(rSrc3, src3Name);
 
 	int opdesc = 0;
 	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
@@ -535,7 +535,7 @@ DEF_COMMAND(format3)
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
 #endif
-	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc2<<5) | (rSrc1<<10) | (rSrc3<<17) | (rDest<<24));
+	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc3<<5) | (rSrc2<<10) | (rSrc1<<17) | (rDest<<24));
 
 	return 0;
 }
