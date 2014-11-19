@@ -71,8 +71,10 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	//if (g_opdescCount > 9)
-	//	printf("WARNING: currently using more than 9 opdescs -- libctru has a bug\n");
+	if (g_constantCount > 9)
+		fprintf(stderr, "WARNING: ctrulib currently has a bug when using more than 1 constant\n");
+	if (g_opdescCount > 9)
+		fprintf(stderr, "WARNING: ctrulib currently has a bug when using more than 9 opdescs\n");
 
 	FileClass f(shbinFile, "wb");
 

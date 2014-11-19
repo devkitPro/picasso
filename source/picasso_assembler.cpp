@@ -308,6 +308,10 @@ static int ensure_valid_src2(int reg, const char* name)
 	int _varName = 0, _varName##Sw = 0; \
 	safe_call(parseReg(_argName, _varName, _varName##Sw));
 
+#define ARG_TO_REG2(_varName, _argName) \
+	int _varName = 0, _varName##Sw = 0, _varName##Idx = 0; \
+	safe_call(parseReg(_argName, _varName, _varName##Sw, &_varName##Idx));
+
 /*
 #define ARG_LABEL(_argName) \
 	safe_call(ensureLabel(_argName))
@@ -319,6 +323,10 @@ static int ensure_valid_src2(int reg, const char* name)
 
 #define ARG_TO_SRC1_REG(_reg, _name) \
 	ARG_TO_REG(_reg, _name); \
+	safe_call(ensure_valid_src1(_reg, _name))
+
+#define ARG_TO_SRC1_REG2(_reg, _name) \
+	ARG_TO_REG2(_reg, _name); \
 	safe_call(ensure_valid_src1(_reg, _name))
 
 #define ARG_TO_SRC2_REG(_reg, _name) \
@@ -385,10 +393,19 @@ static inline bool isregp(int x)
 	return x=='o' || x=='v' || x=='r' || x=='c';
 }
 
-static int parseReg(char* pos, int& outReg, int& outSw)
+static inline int convertIdxRegName(const char* reg)
+{
+	if (stricmp(reg, "a0")==0) return 1;
+	if (stricmp(reg, "a1")==0) return 2;
+	if (stricmp(reg, "a2")==0 || stricmp(reg, "lcnt")==0) return 2;
+	return 0;
+}
+
+static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = nullptr)
 {
 	outReg = 0;
 	outSw = DEFAULT_OPSRC;
+	if (idxType) *idxType = 0;
 	if (*pos == '-')
 	{
 		pos++;
@@ -412,7 +429,29 @@ static int parseReg(char* pos, int& outReg, int& outSw)
 		*closePos = 0;
 		*offPos++ = 0;
 		offPos = trim_whitespace(offPos);
-		// TODO: support (idx1[+n]), (idx2[+n]), (lcnt[+n])
+
+		// Check for idxreg+offset
+		int temp = convertIdxRegName(offPos);
+		if (temp>0)
+		{
+			if (!idxType)
+				return throwError("index register not allowed here: %s\n", offPos);
+			*idxType = temp;
+		} else do
+		{
+			auto plusPos = strchr(offPos, '+');
+			if (!plusPos)
+				break;
+			if (!idxType)
+				return throwError("index register not allowed here: %s\n", offPos);
+			*plusPos++ = 0;
+			auto idxRegName = trim_whitespace(offPos);
+			offPos = trim_whitespace(plusPos);
+			*idxType = convertIdxRegName(idxRegName);
+			if (*idxType < 0)
+				return throwError("invalid index register: %s\n", idxRegName);
+		} while (0);
+
 		regOffset = atoi(offPos);
 		if (regOffset < 0)
 			return throwError("invalid register offset: %s\n", offPos);
@@ -479,7 +518,7 @@ DEF_COMMAND(format1)
 	ENSURE_NO_MORE_ARGS();
 
 	ARG_TO_DEST_REG(rDest, destName);
-	ARG_TO_SRC1_REG(rSrc1, src1Name);
+	ARG_TO_SRC1_REG2(rSrc1, src1Name);
 	ARG_TO_SRC2_REG(rSrc2, src2Name);
 
 	int opdesc = 0;
@@ -488,7 +527,7 @@ DEF_COMMAND(format1)
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, opdesc);
 #endif
-	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc2<<7) | (rSrc1<<12) | (rDest<<21));
+	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc2<<7) | (rSrc1<<12) | (rSrc1Idx<<19) | (rDest<<21));
 
 	return 0;
 }
@@ -500,7 +539,7 @@ DEF_COMMAND(format2)
 	ENSURE_NO_MORE_ARGS();
 
 	ARG_TO_DEST_REG(rDest, destName);
-	ARG_TO_SRC1_REG(rSrc1, src1Name);
+	ARG_TO_SRC1_REG2(rSrc1, src1Name);
 
 	int opdesc = 0;
 	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, 0, 0), OPDESC_MASK_D1));
@@ -508,7 +547,7 @@ DEF_COMMAND(format2)
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, opdesc);
 #endif
-	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc1<<12) | (rDest<<21));
+	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc1<<12) | (rSrc1Idx<<19) | (rDest<<21));
 
 	return 0;
 }
@@ -540,6 +579,24 @@ DEF_COMMAND(format3)
 	return 0;
 }
 
+DEF_COMMAND(format4)
+{
+	NEXT_ARG(src1Name);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TO_SRC1_REG2(rSrc1, src1Name);
+
+	int opdesc = 0;
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(0, rSrc1Sw, 0, 0), OPDESC_MASK_1));
+
+#ifdef DEBUG
+	printf("%s:%02X d%02X (0x%X)\n", cmdName, opcode, rSrc1, opdesc);
+#endif
+	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc1<<12) | (rSrc1Idx<<19));
+
+	return 0;
+}
+
 static const cmdTableType cmdTable[] =
 {
 	DEC_COMMAND(NOP, format0),
@@ -557,6 +614,8 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(MOV, format2),
 
 	DEC_COMMAND(MAD, format3),
+
+	DEC_COMMAND(ARL, format4),
 
 	{ nullptr, nullptr },
 };
