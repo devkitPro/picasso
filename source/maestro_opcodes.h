@@ -4,31 +4,54 @@ enum
 	MAESTRO_ADD = 0x00,
 	MAESTRO_DP3,
 	MAESTRO_DP4,
-
-	MAESTRO_MUL = 0x08,
-
-	MAESTRO_MAX = 0x0C,
+	MAESTRO_DPH,
+	MAESTRO_unk4,
+	MAESTRO_EX2,
+	MAESTRO_LG2,
+	MAESTRO_unk7,
+	MAESTRO_MUL,
+	MAESTRO_SGE,
+	MAESTRO_SLT,
+	MAESTRO_FLR,
+	MAESTRO_MAX,
 	MAESTRO_MIN,
 	MAESTRO_RCP,
 	MAESTRO_RSQ,
 
-	MAESTRO_ARL = 0x12,
+	MAESTRO_unk10,
+	MAESTRO_unk11,
+	MAESTRO_ARL,
 	MAESTRO_MOV,
+	MAESTRO_unk14,
+	MAESTRO_unk15,
+	MAESTRO_unk16,
+	MAESTRO_unk17,
+	MAESTRO_DPHI,
+	MAESTRO_unk19,
+	MAESTRO_SGEI,
+	MAESTRO_SLTI,
+	MAESTRO_unk1C,
+	MAESTRO_unk1D,
+	MAESTRO_unk1E,
+	MAESTRO_unk1F,
 
-	MAESTRO_NOP = 0x21,
+	MAESTRO_unk20,
+	MAESTRO_NOP,
 	MAESTRO_END,
-
-	MAESTRO_CALL = 0x24,
-
-	MAESTRO_CALLC = 0x26,
-	MAESTRO_IFB,
-	MAESTRO_IF, // ???
-
-	MAESTRO_EMIT = 0x2A, // Geometry shader related
+	MAESTRO_BREAKC,
+	MAESTRO_CALL,
+	MAESTRO_CALLC,
+	MAESTRO_CALLU,
+	MAESTRO_IFU,
+	MAESTRO_IFC,
+	MAESTRO_FOR,
+	MAESTRO_EMIT, // Geometry shader related
 	MAESTRO_SETEMIT, // Geometry shader related
+	MAESTRO_JMPC,
+	MAESTRO_JMPU,
+	MAESTRO_CMP, // only the upper 5 bits are used for the opcode
 
-	MAESTRO_CMP = 0x2E,
-	MAESTRO_CMP2, // ???
-
-	MAESTRO_MAD = 0x38, // only the upper 3 bits are used for the opcode
+	// Only the upper 3 bits are used for the following opcodes
+	MAESTRO_LRP = 0x30, 
+	MAESTRO_MAD = 0x38,
 };

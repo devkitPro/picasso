@@ -532,7 +532,7 @@ DEF_COMMAND(format1)
 	return 0;
 }
 
-DEF_COMMAND(format2)
+DEF_COMMAND(format1u)
 {
 	NEXT_ARG(destName);
 	NEXT_ARG(src1Name);
@@ -552,7 +552,7 @@ DEF_COMMAND(format2)
 	return 0;
 }
 
-DEF_COMMAND(format3)
+DEF_COMMAND(format5)
 {
 	NEXT_ARG(destName);
 	NEXT_ARG(src1Name);
@@ -579,7 +579,7 @@ DEF_COMMAND(format3)
 	return 0;
 }
 
-DEF_COMMAND(format4)
+DEF_COMMAND(formatarl)
 {
 	NEXT_ARG(src1Name);
 	ENSURE_NO_MORE_ARGS();
@@ -605,17 +605,23 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(ADD, format1),
 	DEC_COMMAND(DP3, format1),
 	DEC_COMMAND(DP4, format1),
+	DEC_COMMAND(DPH, format1),
 	DEC_COMMAND(MUL, format1),
+	DEC_COMMAND(SGE, format1),
+	DEC_COMMAND(SLT, format1),
 	DEC_COMMAND(MAX, format1),
 	DEC_COMMAND(MIN, format1),
 
-	DEC_COMMAND(RCP, format2),
-	DEC_COMMAND(RSQ, format2),
-	DEC_COMMAND(MOV, format2),
+	DEC_COMMAND(EX2, format1u),
+	DEC_COMMAND(LG2, format1u),
+	DEC_COMMAND(FLR, format1u),
+	DEC_COMMAND(RCP, format1u),
+	DEC_COMMAND(RSQ, format1u),
+	DEC_COMMAND(ARL, formatarl),
+	DEC_COMMAND(MOV, format1u),
 
-	DEC_COMMAND(MAD, format3),
-
-	DEC_COMMAND(ARL, format4),
+	DEC_COMMAND(LRP, format5),
+	DEC_COMMAND(MAD, format5),
 
 	{ nullptr, nullptr },
 };
