@@ -41,7 +41,10 @@ enum
 #define OPDESC_MASK_D1   OPDESC_MAKE(0xF, 0x1FF, 0,     0)
 #define OPDESC_MASK_1    OPDESC_MAKE(0,   0x1FF, 0,     0)
 
-extern std::vector<u32> g_outputBuf;
+typedef std::vector<u32> outputBufType;
+typedef outputBufType::iterator outputBufIter;
+
+extern outputBufType g_outputBuf;
 
 enum
 {
@@ -105,8 +108,17 @@ extern int g_constantCount;
 
 typedef std::pair<size_t, size_t> procedure; // position, size
 typedef std::pair<size_t, const char*> relocation;
-extern std::map<std::string, procedure> g_procTable;
-extern std::map<std::string, size_t> g_labels;
-extern std::map<std::string, int> g_aliases;
+
+typedef std::map<std::string, procedure> procTableType;
+typedef std::map<std::string, size_t> labelTableType;
+typedef std::map<std::string, int> aliasTableType;
+
+typedef procTableType::iterator procTableIter;
+typedef labelTableType::iterator labelTableIter;
+typedef aliasTableType::iterator aliasTableIter;
+
+extern procTableType g_procTable;
+extern labelTableType g_labels;
+extern aliasTableType g_aliases;
 
 int AssembleString(char* str, const char* initialFilename);

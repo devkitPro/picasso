@@ -64,17 +64,12 @@ int main(int argc, char* argv[])
 	if (rc != 0)
 		return rc;
 
-	auto mainIt = g_procTable.find("main");
+	procTableIter mainIt = g_procTable.find("main");
 	if (mainIt == g_procTable.end())
 	{
 		fprintf(stderr, "Error: main proc not defined\n");
 		return 1;
 	}
-
-	if (g_constantCount > 9)
-		fprintf(stderr, "WARNING: ctrulib currently has a bug when using more than 1 constant\n");
-	if (g_opdescCount > 9)
-		fprintf(stderr, "WARNING: ctrulib currently has a bug when using more than 9 opdescs\n");
 
 	FileClass f(shbinFile, "wb");
 
@@ -131,8 +126,9 @@ int main(int argc, char* argv[])
 	f.WriteWord(0); // size of symbol table
 
 	// Write program
-	for (u32 p : g_outputBuf)
-		f.WriteWord(p);
+	//for (u32 p : g_outputBuf)
+	for (outputBufIter it = g_outputBuf.begin(); it != g_outputBuf.end(); ++it)
+		f.WriteWord(*it);
 
 	// Write opdescs
 	for (int i = 0; i < g_opdescCount; i ++)
@@ -144,7 +140,7 @@ int main(int argc, char* argv[])
 	// Write constants
 	for (int i = 0; i < g_constantCount; i ++)
 	{
-		auto& ct = g_constantTable[i];
+		Constant& ct = g_constantTable[i];
 		f.WriteHword(0);
 		f.WriteByte(ct.regId-0x20);
 		f.WriteByte(0);
@@ -160,7 +156,7 @@ int main(int argc, char* argv[])
 	size_t sp = 0;
 	for (int i = 0; i < g_uniformCount; i ++)
 	{
-		auto& u = g_uniformTable[i];
+		Uniform& u = g_uniformTable[i];
 		size_t l = strlen(u.name)+1;
 		f.WriteWord(sp); sp += l;
 		f.WriteHword(u.pos-0x20);
@@ -176,14 +172,14 @@ int main(int argc, char* argv[])
 	// Write symbols
 	for (int i = 0; i < g_uniformCount; i ++)
 	{
-		auto u = g_uniformTable[i].name;
+		const char* u = g_uniformTable[i].name;
 		size_t l = strlen(u)+1;
 		f.WriteRaw(u, l);
 	}
 
 	if (hFile)
 	{
-		auto f2 = fopen(hFile, "w");
+		FILE* f2 = fopen(hFile, "w");
 		if (!f2)
 		{
 			fprintf(stderr, "Can't open header file!\n");
@@ -194,7 +190,7 @@ int main(int argc, char* argv[])
 		fprintf(f2, "#pragma once\n");
 		for (int i = 0; i < g_uniformCount; i ++)
 		{
-			auto& u = g_uniformTable[i];
+			Uniform& u = g_uniformTable[i];
 			fprintf(f2, "#define SHADER_UREG_%s 0x%02X\n", u.name, u.pos-0x20);
 			fprintf(f2, "#define SHADER_ULEN_%s %d\n", u.name, u.size);
 		}

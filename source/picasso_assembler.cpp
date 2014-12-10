@@ -4,7 +4,7 @@
 #define BUF g_outputBuf
 #define NO_MORE_STACK (g_stackPos==MAX_STACK)
 
-static const char* curFile = nullptr;
+static const char* curFile = NULL;
 static int curLine = -1;
 
 std::vector<u32> g_outputBuf;
@@ -34,10 +34,10 @@ static char* mystrtok_pos;
 static char* mystrtok(char* str, const char* delim)
 {
 	if (!str) str = mystrtok_pos;
-	if (!*str) return nullptr;
+	if (!*str) return NULL;
 
 	size_t pos = strcspn(str, delim);
-	auto ret = str;
+	char* ret = str;
 	str += pos;
 	if (*str)
 		*str++ = 0;
@@ -47,8 +47,8 @@ static char* mystrtok(char* str, const char* delim)
 
 static char* mystrtok_spc(char* str)
 {
-	auto ret = mystrtok(str, " \t");
-	if (!ret) return nullptr;
+	char* ret = mystrtok(str, " \t");
+	if (!ret) return NULL;
 	if (*mystrtok_pos)
 		for (; *mystrtok_pos && isspace(*mystrtok_pos); mystrtok_pos++);
 	return ret;
@@ -64,7 +64,7 @@ static char* remove_comment(char* buf)
 static char* trim_whitespace(char* buf)
 {
 	if (!buf)
-		return nullptr;
+		return NULL;
 
 	// Remove trailing whitespace
 	int pos;
@@ -104,7 +104,7 @@ static int throwError(const char* msg, ...)
 
 static int parseInt(char* pos, int& out, long long min, long long max)
 {
-	char* endptr = nullptr;
+	char* endptr = NULL;
 	long long res = strtoll(pos, &endptr, 0);
 	if (pos == endptr)
 		return throwError("Invalid value: %s\n", pos);
@@ -128,18 +128,18 @@ int AssembleString(char* str, const char* initialFilename)
 	curLine = 1;
 
 	int nextLineIncr = 0;
-	char* nextStr = nullptr;
+	char* nextStr = NULL;
 	for (; str; str = nextStr, curLine += nextLineIncr)
 	{
 		size_t len = strcspn(str, "\n");
 		int linedelim = str[len];
 		str[len] = 0;
-		nextStr = linedelim ? (str + len + 1) : nullptr;
+		nextStr = linedelim ? (str + len + 1) : NULL;
 		nextLineIncr = linedelim == '\n' ? 1 : 0;
 
 		char* line = trim_whitespace(remove_comment(str));
 
-		char* colonPos = nullptr;
+		char* colonPos = NULL;
 		for (;;)
 		{
 			colonPos = strchr(line, ':');
@@ -152,7 +152,7 @@ int AssembleString(char* str, const char* initialFilename)
 			if (!validateIdentifier(labelName))
 				return throwError("invalid label name: %s\n", labelName);
 
-			auto ret = g_labels.insert( std::pair<std::string,size_t>(labelName, BUF.size()) );
+			std::pair<labelTableIter,bool> ret = g_labels.insert( std::pair<std::string,size_t>(labelName, BUF.size()) );
 			if (!ret.second)
 				return throwError("duplicate label: %s\n", labelName);
 
@@ -197,17 +197,17 @@ int AssembleString(char* str, const char* initialFilename)
 
 static char* nextArg()
 {
-	return trim_whitespace(mystrtok(nullptr, ","));
+	return trim_whitespace(mystrtok(NULL, ","));
 }
 
 static char* nextArgCParen()
 {
-	return trim_whitespace(mystrtok(nullptr, "("));
+	return trim_whitespace(mystrtok(NULL, "("));
 }
 
 static char* nextArgSpc()
 {
-	return trim_whitespace(mystrtok_spc(nullptr));
+	return trim_whitespace(mystrtok_spc(NULL));
 }
 
 static int missingParam()
@@ -401,7 +401,7 @@ static inline int convertIdxRegName(const char* reg)
 	return 0;
 }
 
-static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = nullptr)
+static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 {
 	outReg = 0;
 	outSw = DEFAULT_OPSRC;
@@ -411,7 +411,7 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = nullptr)
 		pos++;
 		outSw |= 1; // negation bit
 	}
-	auto dotPos = strchr(pos, '.');
+	char* dotPos = strchr(pos, '.');
 	if (dotPos)
 	{
 		*dotPos++ = 0;
@@ -420,10 +420,10 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = nullptr)
 			return throwError("invalid swizzling mask: %s\n", dotPos);
 	}
 	int regOffset = 0;
-	auto offPos = strchr(pos, '[');
+	char* offPos = strchr(pos, '[');
 	if (offPos)
 	{
-		auto closePos = strchr(offPos, ']');
+		char* closePos = strchr(offPos, ']');
 		if (!closePos)
 			return throwError("missing closing bracket: %s\n", pos);
 		*closePos = 0;
@@ -439,13 +439,13 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = nullptr)
 			*idxType = temp;
 		} else do
 		{
-			auto plusPos = strchr(offPos, '+');
+			char* plusPos = strchr(offPos, '+');
 			if (!plusPos)
 				break;
 			if (!idxType)
 				return throwError("index register not allowed here: %s\n", offPos);
 			*plusPos++ = 0;
-			auto idxRegName = trim_whitespace(offPos);
+			char* idxRegName = trim_whitespace(offPos);
 			offPos = trim_whitespace(plusPos);
 			*idxType = convertIdxRegName(idxRegName);
 			if (*idxType < 0)
@@ -456,7 +456,7 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = nullptr)
 		if (regOffset < 0)
 			return throwError("invalid register offset: %s\n", offPos);
 	}
-	auto it = g_aliases.find(pos);
+	aliasTableIter it = g_aliases.find(pos);
 	if (it != g_aliases.end())
 	{
 		int x = it->second;
@@ -623,7 +623,7 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(LRP, format5),
 	DEC_COMMAND(MAD, format5),
 
-	{ nullptr, nullptr },
+	{ NULL, NULL },
 };
 
 // --------------------------------------------------------------------
@@ -638,7 +638,7 @@ DEF_DIRECTIVE(proc)
 	if (NO_MORE_STACK)
 		return throwError("too many nested blocks\n");
 
-	auto& elem = g_stack[g_stackPos++];
+	StackEntry& elem = g_stack[g_stackPos++];
 	elem.type = SE_PROC;
 	elem.pos = BUF.size();
 	elem.strExtra = procName;
@@ -658,7 +658,7 @@ DEF_DIRECTIVE(end)
 	if (!g_stackPos)
 		return throwError(".end with unmatched block\n");
 	
-	auto& elem = g_stack[--g_stackPos];
+	StackEntry& elem = g_stack[--g_stackPos];
 	u32 curPos = BUF.size();
 	u32 size = curPos - elem.pos;
 
@@ -726,7 +726,7 @@ DEF_DIRECTIVE(uniform)
 		if (g_aliases.find(argText) != g_aliases.end())
 			return duplicateIdentifier(argText);
 
-		auto& uniform = g_uniformTable[g_uniformCount++];
+		Uniform& uniform = g_uniformTable[g_uniformCount++];
 		uniform.name = argText;
 		uniform.pos = uniformPos;
 		uniform.size = uSize;
@@ -746,9 +746,9 @@ DEF_DIRECTIVE(const)
 	NEXT_ARG(arg0Text);
 	NEXT_ARG(arg1Text);
 	NEXT_ARG(arg2Text);
-	auto arg3Text = mystrtok_pos;
+	char* arg3Text = mystrtok_pos;
 	if (!mystrtok_pos) return missingParam();
-	auto parenPos = strchr(arg3Text, ')');
+	char* parenPos = strchr(arg3Text, ')');
 	if (!parenPos) return throwError("invalid syntax\n");
 	*parenPos = 0;
 	arg3Text = trim_whitespace(arg3Text);
@@ -759,7 +759,7 @@ DEF_DIRECTIVE(const)
 	if (g_aliases.find(constName) != g_aliases.end())
 		return duplicateIdentifier(constName);
 
-	auto& ct = g_constantTable[g_constantCount++];
+	Constant& ct = g_constantTable[g_constantCount++];
 	ct.regId = uniformPos++;
 	ct.param[0] = atof(arg0Text);
 	ct.param[1] = atof(arg1Text);
@@ -799,7 +799,7 @@ DEF_DIRECTIVE(out)
 		return throwError("invalid identifier: %s\n", outName);
 
 	int sw = DEFAULT_OPSRC;
-	auto dotPos = strchr(outType, '.');
+	char* dotPos = strchr(outType, '.');
 	if (dotPos)
 	{
 		*dotPos++ = 0;
@@ -837,7 +837,7 @@ static const cmdTableType dirTable[] =
 	DEC_DIRECTIVE(uniform),
 	DEC_DIRECTIVE(const),
 	DEC_DIRECTIVE(out),
-	{ nullptr, nullptr },
+	{ NULL, NULL },
 };
 
 int ProcessCommand(const char* cmd)
