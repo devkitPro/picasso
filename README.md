@@ -8,7 +8,11 @@ Currently there's no documentation; refer to `example.vsh` in order to figure ou
 
 ## Building
 
-A working C++11 compiler for the host is required (Windows users: use TDM-GCC). Use `make` to build the program.
+A working C++ compiler for the host is required (Windows users: use TDM-GCC), plus autotools. Use the following commands to build the program:
+
+    ./autogen.sh
+    ./configure
+    make
 
 ## Shout-outs
 

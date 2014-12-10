@@ -6,3 +6,26 @@
 *.vsh.h
 *.bat
 build/
+
+# The following is bullshit generated and/or required by autotools
+
+NEWS
+README
+AUTHORS
+ChangeLog
+INSTALL
+Makefile.in
+aclocal.m4
+autom4te.cache
+config.guess
+config.sub
+configure
+depcomp
+install-sh
+missing
+config.log
+config.status
+Makefile
+picasso
+.deps/
+*.bz2
