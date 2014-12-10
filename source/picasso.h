@@ -19,6 +19,10 @@
 
 #include "maestro_opcodes.h"
 
+#if !defined(WIN32) && !defined(stricmp)
+#define stricmp strcasecmp
+#endif
+
 enum
 {
 	COMP_X = 0,
