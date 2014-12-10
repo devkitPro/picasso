@@ -17,6 +17,13 @@ typedef uint8_t u8;
 #define BIT(n) (1U << (n))
 
 #if !defined(__GNUC__) || (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 6)
+#ifndef __BYTE_ORDER__
+#include <sys/param.h>
+#define __BYTE_ORDER__ BYTE_ORDER
+#define __ORDER_LITTLE_ENDIAN__ LITTLE_ENDIAN
+#define __ORDER_BIG_ENDIAN__ BIG_ENDIAN
+#endif
+
 static inline uint16_t __builtin_bswap16(uint16_t x)
 {
 	return ((x << 8) & 0xff00) | ((x >> 8) & 0x00ff);
