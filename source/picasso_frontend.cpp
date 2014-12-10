@@ -159,8 +159,8 @@ int main(int argc, char* argv[])
 		Uniform& u = g_uniformTable[i];
 		size_t l = strlen(u.name)+1;
 		f.WriteWord(sp); sp += l;
-		f.WriteHword(u.pos-0x20);
-		f.WriteHword(u.pos+u.size-1-0x20);
+		f.WriteHword(u.pos-0x10);
+		f.WriteHword(u.pos+u.size-1-0x10);
 	}
 
 	// Write size of symbol table
