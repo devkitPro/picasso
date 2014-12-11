@@ -198,7 +198,17 @@ int main(int argc, char* argv[])
 		for (int i = 0; i < g_uniformCount; i ++)
 		{
 			Uniform& u = g_uniformTable[i];
-			fprintf(f2, "#define SHADER_UREG_%s 0x%02X\n", u.name, u.pos-0x20);
+			if (u.type == UTYPE_FVEC)
+				fprintf(f2, "#define SHADER_FVEC_%s 0x%02X\n", u.name, u.pos-0x20);
+			else if (u.type == UTYPE_IVEC)
+				fprintf(f2, "#define SHADER_IVEC_%s 0x%02X\n", u.name, u.pos-0x80);
+			else if (u.type == UTYPE_BOOL)
+			{
+				if (u.size == 1)
+					fprintf(f2, "#define SHADER_FLAG_%s BIT(%d)\n", u.name, u.pos-0x88);
+				else
+					fprintf(f2, "#define SHADER_FLAG_%s(_n) BIT(%d+(_n))\n", u.name, u.pos-0x88);
+			}
 			fprintf(f2, "#define SHADER_ULEN_%s %d\n", u.name, u.size);
 		}
 
