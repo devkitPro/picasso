@@ -548,6 +548,28 @@ DEF_COMMAND(format1)
 	return 0;
 }
 
+DEF_COMMAND(format1i)
+{
+	NEXT_ARG(destName);
+	NEXT_ARG(src1Name);
+	NEXT_ARG(src2Name);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TO_DEST_REG(rDest, destName);
+	ARG_TO_SRC2_REG(rSrc1, src1Name);
+	ARG_TO_SRC1_REG2(rSrc2, src2Name);
+
+	int opdesc = 0;
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_D12));
+
+#ifdef DEBUG
+	printf("%s:%02X d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, opdesc);
+#endif
+	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc2<<7) | (rSrc1<<14) | (rSrc2Idx<<19) | (rDest<<21));
+
+	return 0;
+}
+
 DEF_COMMAND(format1u)
 {
 	NEXT_ARG(destName);
@@ -627,6 +649,10 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(SLT, format1),
 	DEC_COMMAND(MAX, format1),
 	DEC_COMMAND(MIN, format1),
+
+	DEC_COMMAND(DPHI, format1i),
+	DEC_COMMAND(SGEI, format1i),
+	DEC_COMMAND(SLTI, format1i),
 
 	DEC_COMMAND(EX2, format1u),
 	DEC_COMMAND(LG2, format1u),
