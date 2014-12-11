@@ -66,7 +66,8 @@ extern outputBufType g_outputBuf;
 enum
 {
 	SE_PROC,
-	SE_IFB,
+	SE_FOR,
+	SE_IF,
 };
 
 struct StackEntry

@@ -747,8 +747,87 @@ DEF_COMMAND(formatcall)
 	BUF.push_back(FMT_OPCODE(opcode));
 
 #ifdef DEBUG
-	printf("%s:%02H %s\n", cmdName, opcode, procName);
+	printf("%s:%02X %s\n", cmdName, opcode, procName);
 #endif
+	return 0;
+}
+
+DEF_COMMAND(formatfor)
+{
+	NEXT_ARG(regName);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TO_IREG(regId, regName);
+
+	if (NO_MORE_STACK)
+		return throwError("too many nested blocks\n");
+
+	StackEntry& elem = g_stack[g_stackPos++];
+	elem.type = SE_FOR;
+	elem.pos = BUF.size();
+
+	BUF.push_back(FMT_OPCODE(opcode) | ((regId-0x80) << 22));
+
+#ifdef DEBUG
+	printf("%s:%02X d%02X\n", cmdName, opcode, regId);
+#endif
+	return 0;
+}
+
+DEF_COMMAND(format2)
+{
+	return 0;
+}
+
+DEF_COMMAND(format3)
+{
+	NEXT_ARG(regName);
+
+	ARG_TO_BREG(regId, regName);
+
+	switch (opcode)
+	{
+		case MAESTRO_CALLU:
+		case MAESTRO_JMPU:
+		{
+			NEXT_ARG(targetName);
+			ENSURE_NO_MORE_ARGS();
+
+			ARG_TARGET(targetName);
+
+			Relocation r;
+			r.instPos = BUF.size();
+			r.target = targetName;
+			r.isProc = opcode==MAESTRO_CALLU;
+			g_relocs.push_back(r);
+
+#ifdef DEBUG
+			printf("%s:%02X d%02X, %s\n", cmdName, opcode, regId, targetName);
+#endif
+			break;
+		}
+
+		case MAESTRO_IFU:
+		{
+			ENSURE_NO_MORE_ARGS();
+
+			if (NO_MORE_STACK)
+				return throwError("too many nested blocks\n");
+
+			StackEntry& elem = g_stack[g_stackPos++];
+			elem.type = SE_IF;
+			elem.pos = BUF.size();
+			elem.uExtra = 0;
+
+#ifdef DEBUG
+			printf("%s:%02X d%02X\n", cmdName, opcode, regId);
+#endif
+			break;
+		}
+	}
+
+	BUF.push_back(FMT_OPCODE(opcode) | ((regId-0x88) << 22));
+
 	return 0;
 }
 
@@ -783,6 +862,16 @@ static const cmdTableType cmdTable[] =
 
 	DEC_COMMAND(CALL, formatcall),
 
+	DEC_COMMAND(FOR, formatfor),
+
+	DEC_COMMAND(CALLC, format2),
+	DEC_COMMAND(IFC, format2),
+	DEC_COMMAND(JMPC, format2),
+
+	DEC_COMMAND(CALLU, format3),
+	DEC_COMMAND(IFU, format3),
+	DEC_COMMAND(JMPU, format3),
+
 	DEC_COMMAND(LRP, format5),
 	DEC_COMMAND(MAD, format5),
 
@@ -815,6 +904,31 @@ DEF_DIRECTIVE(proc)
 	return 0;
 }
 
+DEF_DIRECTIVE(else)
+{
+	ENSURE_NO_MORE_ARGS();
+	if (!g_stackPos)
+		return throwError(".else with unmatched IF\n");
+
+	StackEntry& elem = g_stack[g_stackPos-1];
+	if (elem.type != SE_IF)
+		return throwError(".else with unmatched IF\n");
+	if (elem.uExtra)
+		return throwError("spurious .else\n");
+
+	u32 curPos = BUF.size();
+	elem.uExtra = curPos;
+	u32& inst = BUF[elem.pos];
+	inst &= ~(0xFFF << 10);
+	inst |= curPos << 10;
+
+#ifdef DEBUG
+	printf("ELSE\n");
+#endif
+
+	return 0;
+}
+
 DEF_DIRECTIVE(end)
 {
 	ENSURE_NO_MORE_ARGS();
@@ -833,6 +947,37 @@ DEF_DIRECTIVE(end)
 			printf("proc: %s(%u, size:%u)\n", elem.strExtra, elem.pos, size);
 #endif
 			g_procTable.insert( std::pair<std::string, procedure>(elem.strExtra, procedure(elem.pos, size)) );
+			break;
+		}
+
+		case SE_FOR:
+		{
+#ifdef DEBUG
+			printf("ENDFOR\n");
+#endif
+			u32& inst = BUF[elem.pos];
+			inst &= ~(0xFFF << 10);
+			inst |= (curPos-1) << 10;
+			break;
+		}
+
+		case SE_IF:
+		{
+#ifdef DEBUG
+			printf("ENDIF\n");
+#endif
+			u32& inst = BUF[elem.pos];
+			if (!elem.uExtra)
+			{
+				// IF with no ELSE
+				inst &= ~(0xFFF << 10);
+				inst |= curPos << 10;
+			} else
+			{
+				// IF with an ELSE
+				inst &= ~0x3FF;
+				inst |= curPos - elem.uExtra;
+			}
 			break;
 		}
 	}
@@ -1028,6 +1173,7 @@ DEF_DIRECTIVE(out)
 static const cmdTableType dirTable[] =
 {
 	DEC_DIRECTIVE(proc),
+	DEC_DIRECTIVE(else),
 	DEC_DIRECTIVE(end),
 	DEC_DIRECTIVE(alias),
 	DEC_DIRECTIVE2(fvec, uniform, UTYPE_FVEC),
