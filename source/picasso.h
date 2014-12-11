@@ -46,6 +46,18 @@ enum
 #define OPDESC_MASK_1    OPDESC_MAKE(0,   0x1FF, 0,     0)
 #define OPDESC_MASK_12   OPDESC_MAKE(0,   0x1FF, 0x1FF, 0)
 
+enum
+{
+	COND_EQ = 0,
+	COND_NE,
+	COND_LT,
+	COND_LE,
+	COND_GT,
+	COND_GE,
+	COND_UNK1,
+	COND_UNK2,
+};
+
 typedef std::vector<u32> outputBufType;
 typedef outputBufType::iterator outputBufIter;
 

@@ -283,24 +283,31 @@ static int ensureLabel(const char* lbl)
 }
 */
 
-static int ensure_valid_dest(int reg, const char* name)
+static inline int ensure_valid_dest(int reg, const char* name)
 {
 	if (reg < 0x00 || reg >= 0x20)
 		return throwError("invalid destination register: %s\n", name);
 	return 0;
 }
 
-static int ensure_valid_src1(int reg, const char* name)
+static inline int ensure_valid_src1(int reg, const char* name)
 {
 	if (reg < 0x00 || reg >= 0x80)
 		return throwError("invalid source1 register: %s\n", name);
 	return 0;
 }
 
-static int ensure_valid_src2(int reg, const char* name)
+static inline int ensure_valid_src2(int reg, const char* name)
 {
 	if (reg < 0x00 || reg >= 0x20)
 		return throwError("invalid source2 register: %s\n", name);
+	return 0;
+}
+
+static inline int ensure_valid_condop(int condop, const char* name)
+{
+	if (condop < 0)
+		return throwError("invalid conditional operator: %s\n", name);
 	return 0;
 }
 
@@ -317,6 +324,10 @@ static int ensure_valid_src2(int reg, const char* name)
 #define ARG_TO_REG2(_varName, _argName) \
 	int _varName = 0, _varName##Sw = 0, _varName##Idx = 0; \
 	safe_call(parseReg(_argName, _varName, _varName##Sw, &_varName##Idx));
+
+#define ARG_TO_CONDOP(_varName, _argName) \
+	int _varName = parseCondOp(_argName); \
+	safe_call(ensure_valid_condop(_varName, _argName))
 
 /*
 #define ARG_LABEL(_argName) \
@@ -405,6 +416,19 @@ static inline int convertIdxRegName(const char* reg)
 	if (stricmp(reg, "a1")==0) return 2;
 	if (stricmp(reg, "a2")==0 || stricmp(reg, "lcnt")==0) return 2;
 	return 0;
+}
+
+static inline int parseCondOp(const char* name)
+{
+	if (stricmp(name, "eq")==0) return COND_EQ;
+	if (stricmp(name, "ne")==0) return COND_NE;
+	if (stricmp(name, "lt")==0) return COND_LT;
+	if (stricmp(name, "le")==0) return COND_LE;
+	if (stricmp(name, "gt")==0) return COND_GT;
+	if (stricmp(name, "ge")==0) return COND_GE;
+	if (*name == '6') return COND_UNK1;
+	if (*name == '7') return COND_UNK2;
+	return -1;
 }
 
 static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
@@ -590,6 +614,30 @@ DEF_COMMAND(format1u)
 	return 0;
 }
 
+DEF_COMMAND(format1c)
+{
+	NEXT_ARG(src1Name);
+	NEXT_ARG(cmpxName);
+	NEXT_ARG(cmpyName);
+	NEXT_ARG(src2Name);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TO_SRC1_REG2(rSrc1, src1Name);
+	ARG_TO_CONDOP(cmpx, cmpxName);
+	ARG_TO_CONDOP(cmpy, cmpyName);
+	ARG_TO_SRC2_REG(rSrc2, src2Name);
+
+	int opdesc = 0;
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(0, rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_12));
+
+#ifdef DEBUG
+	printf("%s:%02X d%02X, %d, %d, d%02X (0x%X)\n", cmdName, opcode, rSrc1, cmpx, cmpy, rSrc2, opdesc);
+#endif
+	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc2<<7) | (rSrc1<<12) | (rSrc1Idx<<19) | (cmpy<<21) | (cmpx<<24));
+
+	return 0;
+}
+
 DEF_COMMAND(format5)
 {
 	NEXT_ARG(destName);
@@ -661,6 +709,8 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(RSQ, format1u),
 	DEC_COMMAND(ARL, formatarl),
 	DEC_COMMAND(MOV, format1u),
+
+	DEC_COMMAND(CMP, format1c),
 
 	DEC_COMMAND(LRP, format5),
 	DEC_COMMAND(MAD, format5),
