@@ -29,9 +29,10 @@ size_t g_constantSize;
 u64 g_outputTable[MAX_OUTPUT];
 int g_outputCount;
 
-std::map<std::string, procedure> g_procTable;
-std::map<std::string, size_t> g_labels;
-std::map<std::string, int> g_aliases;
+procTableType g_procTable;
+labelTableType g_labels;
+aliasTableType g_aliases;
+relocTableType g_relocs;
 
 static char* mystrtok_pos;
 static char* mystrtok(char* str, const char* delim)
@@ -124,6 +125,7 @@ static int parseInt(char* pos, int& out, long long min, long long max)
 	} while(0)
 
 static int ProcessCommand(const char* cmd);
+static int FixupRelocations();
 
 int AssembleString(char* str, const char* initialFilename)
 {
@@ -189,8 +191,36 @@ int AssembleString(char* str, const char* initialFilename)
 	if (g_stackPos)
 		return throwError("unclosed block(s)\n");
 
-	//safe_call(FixupRelocations());
+	safe_call(FixupRelocations());
 	
+	return 0;
+}
+
+int FixupRelocations()
+{
+	for (relocTableIter it = g_relocs.begin(); it != g_relocs.end(); ++it)
+	{
+		Relocation& r = *it;
+		u32& inst = BUF[r.instPos];
+		if (r.isProc)
+		{
+			procTableIter proc = g_procTable.find(r.target);
+			if (proc == g_procTable.end())
+				return throwError("procedure '%s' is undefined\n", r.target);
+			u32 dst = proc->second.first;
+			u32 num = proc->second.second;
+			inst &= ~0x3FFFFF;
+			inst |= num | (dst << 10);
+		} else
+		{
+			labelTableIter lbl = g_labels.find(r.target);
+			if (lbl == g_labels.end())
+				return throwError("label '%s' is undefined\n", r.target);
+			u32 dst = lbl->second;
+			inst &= ~(0xFFF << 10);
+			inst |= dst << 10;
+		}
+	}
 	return 0;
 }
 
@@ -274,14 +304,12 @@ static int duplicateIdentifier(const char* id)
 	return throwError("identifier already used: %s\n", id);
 }
 
-/*
-static int ensureLabel(const char* lbl)
+static int ensureTarget(const char* target)
 {
-	if (!validateIdentifier(lbl))
-		return throwError("invalid target label: %s\n", lbl);
+	if (!validateIdentifier(target))
+		return throwError("invalid target: %s\n", target);
 	return 0;
 }
-*/
 
 static inline int ensure_valid_dest(int reg, const char* name)
 {
@@ -301,6 +329,20 @@ static inline int ensure_valid_src2(int reg, const char* name)
 {
 	if (reg < 0x00 || reg >= 0x20)
 		return throwError("invalid source2 register: %s\n", name);
+	return 0;
+}
+
+static inline int ensure_valid_ireg(int reg, const char* name)
+{
+	if (reg < 0x80 || reg >= 0x88)
+		return throwError("invalid integer vector uniform: %s\n", name);
+	return 0;
+}
+
+static inline int ensure_valid_breg(int reg, const char* name)
+{
+	if (reg < 0x88 || reg >= 0x98)
+		return throwError("invalid boolean uniform: %s\n", name);
 	return 0;
 }
 
@@ -329,10 +371,8 @@ static inline int ensure_valid_condop(int condop, const char* name)
 	int _varName = parseCondOp(_argName); \
 	safe_call(ensure_valid_condop(_varName, _argName))
 
-/*
-#define ARG_LABEL(_argName) \
-	safe_call(ensureLabel(_argName))
-*/
+#define ARG_TARGET(_argName) \
+	safe_call(ensureTarget(_argName))
 
 #define ARG_TO_DEST_REG(_reg, _name) \
 	ARG_TO_REG(_reg, _name); \
@@ -349,6 +389,14 @@ static inline int ensure_valid_condop(int condop, const char* name)
 #define ARG_TO_SRC2_REG(_reg, _name) \
 	ARG_TO_REG(_reg, _name); \
 	safe_call(ensure_valid_src2(_reg, _name))
+
+#define ARG_TO_IREG(_reg, _name) \
+	ARG_TO_REG(_reg, _name); \
+	safe_call(ensure_valid_ireg(_reg, _name))
+
+#define ARG_TO_BREG(_reg, _name) \
+	ARG_TO_REG(_reg, _name); \
+	safe_call(ensure_valid_breg(_reg, _name))
 
 static int parseSwizzling(const char* b)
 {
@@ -683,6 +731,27 @@ DEF_COMMAND(formatarl)
 	return 0;
 }
 
+DEF_COMMAND(formatcall)
+{
+	NEXT_ARG(procName);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TARGET(procName);
+
+	Relocation r;
+	r.instPos = BUF.size();
+	r.target = procName;
+	r.isProc = true;
+	g_relocs.push_back(r);
+
+	BUF.push_back(FMT_OPCODE(opcode));
+
+#ifdef DEBUG
+	printf("%s:%02H %s\n", cmdName, opcode, procName);
+#endif
+	return 0;
+}
+
 static const cmdTableType cmdTable[] =
 {
 	DEC_COMMAND(NOP, format0),
@@ -711,6 +780,8 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(MOV, format1u),
 
 	DEC_COMMAND(CMP, format1c),
+
+	DEC_COMMAND(CALL, formatcall),
 
 	DEC_COMMAND(LRP, format5),
 	DEC_COMMAND(MAD, format5),

@@ -137,19 +137,28 @@ extern Constant g_constantTable[MAX_CONSTANT];
 extern int g_constantCount;
 extern size_t g_constantSize;
 
+struct Relocation
+{
+	size_t instPos;
+	const char* target;
+	bool isProc;
+};
+
 typedef std::pair<size_t, size_t> procedure; // position, size
-typedef std::pair<size_t, const char*> relocation;
 
 typedef std::map<std::string, procedure> procTableType;
 typedef std::map<std::string, size_t> labelTableType;
 typedef std::map<std::string, int> aliasTableType;
+typedef std::vector<Relocation> relocTableType;
 
 typedef procTableType::iterator procTableIter;
 typedef labelTableType::iterator labelTableIter;
 typedef aliasTableType::iterator aliasTableIter;
+typedef relocTableType::iterator relocTableIter;
 
 extern procTableType g_procTable;
 extern labelTableType g_labels;
 extern aliasTableType g_aliases;
+extern relocTableType g_relocs;
 
 int AssembleString(char* str, const char* initialFilename);
