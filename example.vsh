@@ -2,10 +2,10 @@
 ; Also serves as an example of picasso syntax
 
 ; Uniforms
-.uniform projMtx[4], mdlvMtx[4]
+.fvec projMtx[4], mdlvMtx[4]
 
 ; Constants
-.const myconst(0.0, 1.0, -1.0, 0.0)
+.constf myconst(0.0, 1.0, -1.0, 0.0)
 .alias zeros myconst.xxxx
 .alias ones myconst.yyyy
 .alias negones myconst.zzzz

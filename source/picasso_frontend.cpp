@@ -112,7 +112,7 @@ int main(int argc, char* argv[])
 	f.WriteWord(0); // ???
 	f.WriteWord(paramStart); // offset to constant table
 	f.WriteWord(g_constantCount); // size of constant table
-	paramStart += g_constantCount*0x14;
+	paramStart += g_constantSize;
 	f.WriteWord(paramStart); // offset to label table (TODO)
 	f.WriteWord(0); // size of label table (TODO)
 	f.WriteWord(paramStart); // offset to output table
@@ -141,11 +141,18 @@ int main(int argc, char* argv[])
 	for (int i = 0; i < g_constantCount; i ++)
 	{
 		Constant& ct = g_constantTable[i];
-		f.WriteHword(0);
-		f.WriteByte(ct.regId-0x20);
-		f.WriteByte(0);
-		for (int j = 0; j < 4; j ++)
-			f.WriteWord(f32tof24(ct.param[j]));
+		f.WriteHword(ct.type);
+		if (ct.type == UTYPE_FVEC)
+		{
+			f.WriteHword(ct.regId-0x20);
+			for (int j = 0; j < 4; j ++)
+				f.WriteWord(f32tof24(ct.fparam[j]));
+		} else if (ct.type == UTYPE_IVEC)
+		{
+			f.WriteHword(ct.regId-0x80);
+			for (int j = 0; j < 4; j ++)
+				f.WriteByte(ct.iparam[j]);
+		}
 	}
 
 	// Write outputs

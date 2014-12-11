@@ -44,6 +44,7 @@ enum
 #define OPDESC_MASK_D12  OPDESC_MAKE(0xF, 0x1FF, 0x1FF, 0)
 #define OPDESC_MASK_D1   OPDESC_MAKE(0xF, 0x1FF, 0,     0)
 #define OPDESC_MASK_1    OPDESC_MAKE(0,   0x1FF, 0,     0)
+#define OPDESC_MASK_12   OPDESC_MAKE(0,   0x1FF, 0x1FF, 0)
 
 typedef std::vector<u32> outputBufType;
 typedef outputBufType::iterator outputBufIter;
@@ -77,10 +78,18 @@ extern int g_opdescTable[MAX_OPDESC];
 extern int g_opdeskMasks[MAX_OPDESC]; // used to keep track of used bits
 extern int g_opdescCount;
 
+enum
+{
+	UTYPE_BOOL = 0,
+	UTYPE_IVEC,
+	UTYPE_FVEC,
+};
+
 struct Uniform
 {
 	const char* name;
 	int pos, size;
+	int type;
 };
 
 #define MAX_UNIFORM 0x60
@@ -103,12 +112,18 @@ extern int g_outputCount;
 struct Constant
 {
 	int regId;
-	float param[4];
+	int type;
+	union
+	{
+		float fparam[4];
+		u8 iparam[4];
+	};
 };
 
 #define MAX_CONSTANT 0x60
 extern Constant g_constantTable[MAX_CONSTANT];
 extern int g_constantCount;
+extern size_t g_constantSize;
 
 typedef std::pair<size_t, size_t> procedure; // position, size
 typedef std::pair<size_t, const char*> relocation;

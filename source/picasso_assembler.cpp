@@ -18,10 +18,13 @@ int g_opdescMasks[MAX_OPDESC];
 
 Uniform g_uniformTable[MAX_UNIFORM];
 int g_uniformCount;
-static int uniformPos = 0x20;
+static int fvecUnifPos = 0x20;
+static int ivecUnifPos = 0x80;
+static int boolUnifPos = 0x88;
 
 Constant g_constantTable[MAX_CONSTANT];
 int g_constantCount;
+size_t g_constantSize;
 
 u64 g_outputTable[MAX_OUTPUT];
 int g_outputCount;
@@ -253,10 +256,13 @@ typedef struct
 	{ #name, cmd_##fun, MAESTRO_##name }
 
 #define DEF_DIRECTIVE(name) \
-	static int dir_##name(const char* cmdName, int _unused)
+	static int dir_##name(const char* cmdName, int dirParam)
 
 #define DEC_DIRECTIVE(name) \
 	{ #name, dir_##name, 0 }
+
+#define DEC_DIRECTIVE2(name, fun, opc) \
+	{ #name, dir_##fun, opc }
 
 static int ensureNoMoreArgs()
 {
@@ -390,7 +396,7 @@ static int findOrAddOpdesc(int& out, int opdesc, int mask)
 static inline bool isregp(int x)
 {
 	x = tolower(x);
-	return x=='o' || x=='v' || x=='r' || x=='c';
+	return x=='o' || x=='v' || x=='r' || x=='c' || x=='i' || x=='b';
 }
 
 static inline int convertIdxRegName(const char* reg)
@@ -492,10 +498,20 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 			if (outReg < 0x10 || outReg >= 0x20)
 				return throwError("invalid temporary register: %s(%d)\n", pos);
 			break;
-		case 'c': // Vector uniform registers
+		case 'c': // Floating-point vector uniform registers
 			outReg += 0x20;
 			if (outReg < 0x20 || outReg >= 0x80)
-				return throwError("invalid vector uniform register: %s(%d)\n", pos);
+				return throwError("invalid floating-point vector uniform register: %s(%d)\n", pos);
+			break;
+		case 'i': // Integer vector uniforms
+			outReg += 0x80;
+			if (outReg < 0x80 || outReg >= 0x88)
+				return throwError("invalid integer vector uniform register: %s(%d)\n", pos);
+			break;
+		case 'b': // Boolean uniforms
+			outReg += 0x88;
+			if (outReg < 0x88 || outReg >= 0x98)
+				return throwError("invalid boolean uniform register: %s(%d)\n", pos);
 			break;
 	}
 	outReg += regOffset;
@@ -696,8 +712,22 @@ DEF_DIRECTIVE(alias)
 	return 0;
 }
 
+static inline int& getAllocVar(int type, int& bound)
+{
+	switch (type)
+	{
+		default:
+		case UTYPE_FVEC: bound = 0x80; return fvecUnifPos;
+		case UTYPE_IVEC: bound = 0x88; return ivecUnifPos;
+		case UTYPE_BOOL: bound = 0x98; return boolUnifPos;
+	}
+}
+
 DEF_DIRECTIVE(uniform)
 {
+	int bound;
+	int& uniformPos = getAllocVar(dirParam, bound);
+
 	for (;;)
 	{
 		char* argText = nextArg();
@@ -719,7 +749,7 @@ DEF_DIRECTIVE(uniform)
 		}
 		if (!validateIdentifier(argText))
 			return throwError("invalid uniform name: %s\n", argText);
-		if ((uniformPos+uSize) >= 0x80)
+		if ((uniformPos+uSize) >= bound)
 			return throwError("not enough uniform registers: %s[%d]\n", argText, uSize);
 		if (g_uniformCount == MAX_UNIFORM)
 			return throwError("too many uniforms: %s[%d]\n", argText, uSize);
@@ -730,6 +760,7 @@ DEF_DIRECTIVE(uniform)
 		uniform.name = argText;
 		uniform.pos = uniformPos;
 		uniform.size = uSize;
+		uniform.type = dirParam;
 		uniformPos += uSize;
 		g_aliases.insert( std::pair<std::string,int>(argText, uniform.pos | (DEFAULT_OPSRC<<8)) );
 
@@ -742,6 +773,9 @@ DEF_DIRECTIVE(uniform)
 
 DEF_DIRECTIVE(const)
 {
+	int bound;
+	int& uniformPos = getAllocVar(dirParam, bound);
+
 	NEXT_ARG_CPAREN(constName);
 	NEXT_ARG(arg0Text);
 	NEXT_ARG(arg1Text);
@@ -753,7 +787,7 @@ DEF_DIRECTIVE(const)
 	*parenPos = 0;
 	arg3Text = trim_whitespace(arg3Text);
 
-	if (g_constantCount == MAX_CONSTANT || uniformPos>=0x80)
+	if (g_constantCount == MAX_CONSTANT || uniformPos>=bound)
 		return throwError("not enough space for constant\n");
 
 	if (g_aliases.find(constName) != g_aliases.end())
@@ -761,15 +795,30 @@ DEF_DIRECTIVE(const)
 
 	Constant& ct = g_constantTable[g_constantCount++];
 	ct.regId = uniformPos++;
-	ct.param[0] = atof(arg0Text);
-	ct.param[1] = atof(arg1Text);
-	ct.param[2] = atof(arg2Text);
-	ct.param[3] = atof(arg3Text);
+	ct.type = dirParam;
+	if (dirParam == UTYPE_FVEC)
+	{
+		ct.fparam[0] = atof(arg0Text);
+		ct.fparam[1] = atof(arg1Text);
+		ct.fparam[2] = atof(arg2Text);
+		ct.fparam[3] = atof(arg3Text);
+		g_constantSize += 4 + 4*4;
+	} else if (dirParam == UTYPE_IVEC)
+	{
+		ct.iparam[0] = atoi(arg0Text) & 0xFF;
+		ct.iparam[1] = atoi(arg1Text) & 0xFF;
+		ct.iparam[2] = atoi(arg2Text) & 0xFF;
+		ct.iparam[3] = atoi(arg3Text) & 0xFF;
+		g_constantSize += 4 + 4;
+	}
 
 	g_aliases.insert( std::pair<std::string,int>(constName, ct.regId | (DEFAULT_OPSRC<<8)) );
 
 #ifdef DEBUG
-	printf("constant %s(%f, %f, %f, %f) @ d%02X\n", constName, ct.param[0], ct.param[1], ct.param[2], ct.param[3], ct.regId);
+	if (dirParam == UTYPE_FVEC)
+		printf("constant %s(%f, %f, %f, %f) @ d%02X\n", constName, ct.fparam[0], ct.fparam[1], ct.fparam[2], ct.fparam[3], ct.regId);
+	else if (dirParam == UTYPE_IVEC)
+		printf("constant %s(%u, %u, %u, %u) @ d%02X\n", constName, ct.iparam[0], ct.iparam[1], ct.iparam[2], ct.iparam[3], ct.regId);
 #endif
 	return 0;
 };
@@ -834,8 +883,11 @@ static const cmdTableType dirTable[] =
 	DEC_DIRECTIVE(proc),
 	DEC_DIRECTIVE(end),
 	DEC_DIRECTIVE(alias),
-	DEC_DIRECTIVE(uniform),
-	DEC_DIRECTIVE(const),
+	DEC_DIRECTIVE2(fvec, uniform, UTYPE_FVEC),
+	DEC_DIRECTIVE2(ivec, uniform, UTYPE_IVEC),
+	DEC_DIRECTIVE2(bool, uniform, UTYPE_BOOL),
+	DEC_DIRECTIVE2(constf, const, UTYPE_FVEC),
+	DEC_DIRECTIVE2(consti, const, UTYPE_IVEC),
 	DEC_DIRECTIVE(out),
 	{ NULL, NULL },
 };
