@@ -4,7 +4,7 @@
 
 `picasso` is a PICA200 shader assembler, written in C++. The PICA200 is the GPU used by the Nintendo 3DS.
 
-Currently there's no documentation; refer to `example.vsh` in order to figure out the syntax.
+`picasso` comes with a manual `Manual.md` that explains the shader language. `example.vsh` is simple example that demonstrates it.
 
 ## Building
 
