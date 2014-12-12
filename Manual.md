@@ -67,9 +67,9 @@ Introduces a procedure called `procName`. The procedure is terminated with `.end
 
 ### .else
 ```
-.proc
+.else
 ```
-Introduces the ELSE block of an IF statement.
+Introduces the ELSE section of an IF statement.
 
 ### .end
 ```
@@ -142,6 +142,14 @@ Allocates a new output register, wires it to a certain output property and creat
 - `texcoord0` (or `tcoord0`): In vertex shaders, this represents the texture coordinate that is fed to the Texture Unit 0. The Z and W components are not used.
 - `texcoord1` (or `tcoord1`): As above, but for the Texture Unit 1.
 - `texcoord2` (or `tcoord2`): As above, but for the Texture Unit 2.
+
+Example:
+
+```
+.out outPos position
+.out outClr color
+.out outTex texcoord0
+```
 
 ## Supported Instructions
 
