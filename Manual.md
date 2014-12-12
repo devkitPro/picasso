@@ -55,6 +55,8 @@ For convenience, registers may be addressed using an offset from a known registe
 
 Some source operands of instructions (called SRC1) support relative addressing. This means that it is possible to use one of the three built-in indexing registers (`a0`, `a1` and `a2` aka `lcnt`) to address a register, e.g. `someArray[lcnt]`. Adding an offset is also supported, e.g. `someArray[lcnt+2]`. This is useful in FOR loops.
 
+Normal floating-point vector registers may also be negated by prepending a minus sign before it, e.g. `-r2` or `-someArray[lcnt+2]`.
+
 ## Supported Directives
 
 ### .proc
