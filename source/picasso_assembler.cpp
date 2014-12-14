@@ -713,7 +713,7 @@ DEF_COMMAND(format5)
 	return 0;
 }
 
-DEF_COMMAND(formatarl)
+DEF_COMMAND(formatmova)
 {
 	NEXT_ARG(src1Name);
 	ENSURE_NO_MORE_ARGS();
@@ -855,8 +855,9 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(FLR, format1u),
 	DEC_COMMAND(RCP, format1u),
 	DEC_COMMAND(RSQ, format1u),
-	DEC_COMMAND(ARL, formatarl),
 	DEC_COMMAND(MOV, format1u),
+
+	DEC_COMMAND(MOVA, formatmova),
 
 	DEC_COMMAND(CMP, format1c),
 

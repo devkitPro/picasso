@@ -6,7 +6,7 @@ Comments are introduced by the semicolon character. E.g.
 
 ```
 ; This is a comment
-.vecf myFloat ; They can also appear in the same line
+.fvec myFloat ; They can also appear in the same line
 ```
 
 Identifiers follow the same rules as C identifiers.
@@ -177,8 +177,8 @@ Syntax                            | Description
 `flr rDest, rSrc1`                |
 `rcp rDest, rSrc1`                |
 `rsq rDest, rSrc1`                |
-`arl rSrc1`                       |
 `mov rDest, rSrc1`                |
+`mova rSrc1`                      |
 `cmp rSrc1, opx, opy, rSrc2`      |
 `call procName`                   |
 `for iReg`                        |
