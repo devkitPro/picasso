@@ -201,7 +201,7 @@ Syntax                            | Description
 - `bReg`: Represents a boolean uniform source operand.
 - `procName`: Represents the name of a procedure.
 - `labelName`: Represents the name of a label.
-- `opx` and `opy`: They represent a conditional operator that is applied to the source registers and whose result is stored in the appropriate flag (cmp.x and cmp.y respectively). Supported values include:
+- `opx` and `opy`: They represent a conditional operator that is applied to the source registers and whose result is stored in the appropriate flag (`cmp.x` and `cmp.y` respectively). Supported values include:
 	- `eq`: Equal
 	- `ne`: Not equal
 	- `lt`: Less than
@@ -209,4 +209,7 @@ Syntax                            | Description
 	- `gt`: Greater than
 	- `ge`: Greater or equal than
 	- `6` and `7`: currently unknown, supposedly the result they yield is always true.
-- `condExp`: Represents a conditional expression. Currently this is not implemented.
+- `condExp`: Represents a conditional expression, which uses the conditional flags `cmp.x` and `cmp.y` set by the CMP instruction. These flags may be negated using the `!` symbol, e.g. `!cmp.x`. The conditional expression can take any of the following forms:
+	- `flag1`: It tests a single flag.
+	- `flag1 && flag2`: It performs AND between the two flags. Optionally, a single `&` may be specified.
+	- `flag1 || flag2`: It performs OR between the two flags. Optionally, a single `|` may be specified.

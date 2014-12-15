@@ -590,6 +590,53 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 	return 0;
 }
 
+static int parseCondExpOp(char* str, u32& outFlags, int& which)
+{
+	int negation = 0;
+	for (; *str == '!'; str++) negation ^= 1;
+	if (stricmp(str, "cmp.x")==0)
+	{
+		which = 1;
+		outFlags ^= negation<<25;
+		return 0;
+	}
+	if (stricmp(str, "cmp.y")==0)
+	{
+		which = 0;
+		outFlags ^= negation<<24;
+		return 0;
+	}
+	return throwError("invalid condition register: %s\n", str);
+}
+
+static int parseCondExp(char* str, u32& outFlags)
+{
+	outFlags = BIT(24) | BIT(25);
+	size_t len = strlen(str);
+	size_t pos = strcspn(str, "&|");
+	int op2 = -1;
+	if (pos < len)
+	{
+		char* str2 = str + pos;
+		int type = *str2;
+		*str2++ = 0;
+		if (*str2 == type)
+			str2++;
+		str = trim_whitespace(str);
+		str2 = trim_whitespace(str2);
+		if (type == '&')
+			outFlags |= 1<<22;
+		safe_call(parseCondExpOp(str2, outFlags, op2));
+	}
+	int op1 = -1;
+	safe_call(parseCondExpOp(str, outFlags, op1));
+	if (op1 == op2)
+		return throwError("condition register checked twice\n");
+	if (op2 < 0)
+		outFlags |= (op1+2)<<22;
+	return 0;
+}
+
 DEF_COMMAND(format0)
 {
 	ENSURE_NO_MORE_ARGS();
@@ -776,6 +823,64 @@ DEF_COMMAND(formatfor)
 
 DEF_COMMAND(format2)
 {
+	NEXT_ARG(condExp);
+
+	u32 instruction = 0;
+	safe_call(parseCondExp(condExp, instruction));
+
+	switch (opcode)
+	{
+		case MAESTRO_BREAKC:
+		{
+			ENSURE_NO_MORE_ARGS();
+
+#ifdef DEBUG
+			printf("%s:%02X %s\n", cmdName, opcode, condExp);
+#endif
+			break;
+		}
+
+		case MAESTRO_CALLC:
+		case MAESTRO_JMPC:
+		{
+			NEXT_ARG(targetName);
+			ENSURE_NO_MORE_ARGS();
+
+			ARG_TARGET(targetName);
+
+			Relocation r;
+			r.instPos = BUF.size();
+			r.target = targetName;
+			r.isProc = opcode==MAESTRO_CALLC;
+			g_relocs.push_back(r);
+
+#ifdef DEBUG
+			printf("%s:%02X %s, %s\n", cmdName, opcode, condExp, targetName);
+#endif
+			break;
+		}
+
+		case MAESTRO_IFC:
+		{
+			ENSURE_NO_MORE_ARGS();
+
+			if (NO_MORE_STACK)
+				return throwError("too many nested blocks\n");
+
+			StackEntry& elem = g_stack[g_stackPos++];
+			elem.type = SE_IF;
+			elem.pos = BUF.size();
+			elem.uExtra = 0;
+
+#ifdef DEBUG
+			printf("%s:%02X %s\n", cmdName, opcode, condExp);
+#endif
+			break;
+		}
+	}
+
+	BUF.push_back(FMT_OPCODE(opcode) | instruction);
+
 	return 0;
 }
 
@@ -865,6 +970,7 @@ static const cmdTableType cmdTable[] =
 
 	DEC_COMMAND(FOR, formatfor),
 
+	DEC_COMMAND(BREAKC, format2),
 	DEC_COMMAND(CALLC, format2),
 	DEC_COMMAND(IFC, format2),
 	DEC_COMMAND(JMPC, format2),
