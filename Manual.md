@@ -37,7 +37,7 @@ Directives are special statements that start with a period and control certain a
 PICA200 registers are often used as arguments to instructions. There exist the following registers:
 
 - `o0` through `o7`: Output registers (usable as a destination operand).
-- `i0` through `i7`: Input registers (usable as a source operand).
+- `v0` through `v7`: Input registers (usable as a source operand).
 - `r0` through `r15`: Scratch registers (usable as both destination and source operands).
 - `c0` through `c95`: Floating-point vector uniforms (usable as a special type of source operand called SRC1).
 - `i0` through `i7`: Integer vector uniforms (special purpose).
