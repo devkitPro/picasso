@@ -17,7 +17,7 @@ typedef uint8_t u8;
 #define BIT(n) (1U << (n))
 
 #if !defined(__GNUC__) || (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 6)
-#ifndef __BYTE_ORDER__
+#if !defined(__BYTE_ORDER__) && !defined(WIN32)
 #include <sys/param.h>
 #define __BYTE_ORDER__ BYTE_ORDER
 #define __ORDER_LITTLE_ENDIAN__ LITTLE_ENDIAN
