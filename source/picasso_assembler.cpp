@@ -1144,7 +1144,7 @@ static inline int& getAllocVar(int type, int& bound)
 	{
 		default:
 		case UTYPE_FVEC: bound = 0x80; return fvecUnifPos;
-		case UTYPE_IVEC: bound = 0x88; return ivecUnifPos;
+		case UTYPE_IVEC: bound = 0x84; return ivecUnifPos;
 		case UTYPE_BOOL: bound = 0x98; return boolUnifPos;
 	}
 }
@@ -1253,14 +1253,22 @@ static int parseOutType(const char* text)
 {
 	if (stricmp(text,"pos")==0 || stricmp(text,"position")==0)
 		return OUTTYPE_POS;
+	if (stricmp(text,"nquat")==0 || stricmp(text,"normalquat")==0)
+		return OUTTYPE_NQUAT;
 	if (stricmp(text,"clr")==0 || stricmp(text,"color")==0)
 		return OUTTYPE_CLR;
 	if (stricmp(text,"tcoord0")==0 || stricmp(text,"texcoord0")==0)
 		return OUTTYPE_TCOORD0;
+	if (stricmp(text,"tcoord0w")==0 || stricmp(text,"texcoord0w")==0)
+		return OUTTYPE_TCOORD0W;
 	if (stricmp(text,"tcoord1")==0 || stricmp(text,"texcoord1")==0)
 		return OUTTYPE_TCOORD1;
 	if (stricmp(text,"tcoord2")==0 || stricmp(text,"texcoord2")==0)
 		return OUTTYPE_TCOORD2;
+	if (stricmp(text,"7")==0)
+		return OUTTYPE_7;
+	if (stricmp(text,"view")==0)
+		return OUTTYPE_VIEW;
 	return -1;
 }
 

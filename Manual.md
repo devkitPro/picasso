@@ -40,7 +40,7 @@ PICA200 registers are often used as arguments to instructions. There exist the f
 - `v0` through `v7`: Input registers (usable as a source operand).
 - `r0` through `r15`: Scratch registers (usable as both destination and source operands).
 - `c0` through `c95`: Floating-point vector uniforms (usable as a special type of source operand called SRC1).
-- `i0` through `i7`: Integer vector uniforms (special purpose).
+- `i0` through `i3`: Integer vector uniforms (special purpose).
 - `b0` through `b15`: Boolean uniforms (special purpose).
 
 All registers contain 32-bit floating point vectors; except for integer vector uniforms (containing 8-bit integers) and boolean uniforms. Vectors have 4 components: x, y, z and w. Uniforms are special registers that are writable by the CPU; thus they are used to pass configuration parameters to the shader such as transformation matrices. Sometimes they are preloaded with constant values that may be used in the logic of the shader.
@@ -138,10 +138,14 @@ Reserves a new integer vector uniform to be preloaded with the specified constan
 Allocates a new output register, wires it to a certain output property and creates an alias for it that points to the allocated register. The following property names are supported:
 
 - `position` (or `pos`): In vertex shaders, this represents the position of the outputted vertex.
+- `normalquat` (or `nquat`): Under investigation.
 - `color` (or `clr`): In vertex shaders, this represents the color of the outputted vertex. Its format is (R, G, B, xx) where R,G,B are values ranging from 0.0 to 1.0. The W component isn't used.
 - `texcoord0` (or `tcoord0`): In vertex shaders, this represents the texture coordinate that is fed to the Texture Unit 0. The Z and W components are not used.
-- `texcoord1` (or `tcoord1`): As above, but for the Texture Unit 1.
-- `texcoord2` (or `tcoord2`): As above, but for the Texture Unit 2.
+- `texcoord0w` (or `tcoord0w`): Under investigation.
+- `texcoord1` (or `tcoord1`): As `texcoord0`, but for the Texture Unit 1.
+- `texcoord2` (or `tcoord2`): As `texcoord0`, but for the Texture Unit 2.
+- `7`: Under investigation.
+- `view`: Under investigation.
 
 Example:
 
