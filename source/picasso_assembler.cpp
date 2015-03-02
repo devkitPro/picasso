@@ -596,13 +596,13 @@ static int parseCondExpOp(char* str, u32& outFlags, int& which)
 	for (; *str == '!'; str++) negation ^= 1;
 	if (stricmp(str, "cmp.x")==0)
 	{
-		which = 1;
+		which = 0;
 		outFlags ^= negation<<25;
 		return 0;
 	}
 	if (stricmp(str, "cmp.y")==0)
 	{
-		which = 0;
+		which = 1;
 		outFlags ^= negation<<24;
 		return 0;
 	}
