@@ -52,6 +52,6 @@ enum
 	MAESTRO_CMP, // only the upper 5 bits are used for the opcode
 
 	// Only the upper 3 bits are used for the following opcodes
-	MAESTRO_LRP = 0x30, 
+	MAESTRO_MADI = 0x30,
 	MAESTRO_MAD = 0x38,
 };

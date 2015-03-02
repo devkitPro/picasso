@@ -760,6 +760,33 @@ DEF_COMMAND(format5)
 	return 0;
 }
 
+DEF_COMMAND(format5i)
+{
+	NEXT_ARG(destName);
+	NEXT_ARG(src1Name);
+	NEXT_ARG(src2Name);
+	NEXT_ARG(src3Name);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TO_DEST_REG(rDest, destName);
+	ARG_TO_SRC1_REG(rSrc1, src1Name);
+	ARG_TO_SRC2_REG(rSrc2, src2Name);
+	ARG_TO_SRC1_REG(rSrc3, src3Name);
+
+	int opdesc = 0;
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
+
+	if (opdesc >= 32)
+		return throwError("opdesc allocation error\n");
+
+#ifdef DEBUG
+	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
+#endif
+	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc3<<5) | (rSrc2<<12) | (rSrc1<<17) | (rDest<<24));
+
+	return 0;
+}
+
 DEF_COMMAND(formatmova)
 {
 	NEXT_ARG(src1Name);
@@ -979,7 +1006,7 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(IFU, format3),
 	DEC_COMMAND(JMPU, format3),
 
-	DEC_COMMAND(LRP, format5),
+	DEC_COMMAND(MADI, format5i),
 	DEC_COMMAND(MAD, format5),
 
 	{ NULL, NULL },

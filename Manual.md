@@ -102,7 +102,7 @@ Allocates new integer vector uniforms (or arrays of uniforms) and creates aliase
 
 ### .bool
 ```
-.fvec unifName1, unifName2[size], unifName3, ...
+.bool unifName1, unifName2[size], unifName3, ...
 ```
 Allocates new boolean uniforms (or arrays of uniforms) and creates aliases for them that point to the allocated registers. Example:
 
@@ -189,14 +189,14 @@ Syntax                            | Description
 `callu bReg, procName`            |
 `ifu bReg`                        |
 `jmpu bReg, labelName`            |
-`lrp rDest, rSrcF, rSrc2, rSrc3`  |
-`mad rDest, rSrcF, rSrc2, rSrc3`  |
+`madi rDest, rSrc1, rSrc2, rSrc1` |
+`mad rDest, rSrc1, rSrc1, rSrc2`  |
 
 ### Description of operands
 
 - `rDest`: Represents a destination operand (register).
 - `rSrc1`: Represents a so-called SRC1 source operand (register), which allows accessing floating-point vector uniforms and relative addressing.
-- `rSrc2`, `rSrc3` and `rSrcF`: They represent other source operands (registers), which are limited to input and scratch registers.
+- `rSrc2`: Represents a so-called SRC2 source operand (register), which is limited to input and scratch registers.
 - `iReg`: Represents an integer vector uniform source operand.
 - `bReg`: Represents a boolean uniform source operand.
 - `procName`: Represents the name of a procedure.
