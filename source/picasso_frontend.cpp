@@ -132,10 +132,7 @@ int main(int argc, char* argv[])
 
 	// Write opdescs
 	for (int i = 0; i < g_opdescCount; i ++)
-	{
-		f.WriteWord(g_opdescTable[i]);
-		f.WriteWord(0x0000000F); // unknown
-	}
+		f.WriteDword(g_opdescTable[i]);
 
 	// Write constants
 	for (int i = 0; i < g_constantCount; i ++)
