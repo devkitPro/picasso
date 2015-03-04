@@ -61,6 +61,7 @@ enum
 typedef std::vector<u32> outputBufType;
 typedef outputBufType::iterator outputBufIter;
 
+extern bool g_isGeoShader;
 extern outputBufType g_outputBuf;
 
 enum

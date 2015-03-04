@@ -7,6 +7,7 @@
 static const char* curFile = NULL;
 static int curLine = -1;
 
+bool g_isGeoShader = false;
 std::vector<u32> g_outputBuf;
 
 StackEntry g_stack[MAX_STACK];
@@ -561,9 +562,12 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 	switch (*pos)
 	{
 		case 'o': // Output registers
-		case 'v': // Input attributes
 			if (outReg < 0x00 || outReg >= 0x08)
-				return throwError("invalid input/output register: %s(%d)\n", pos);
+				return throwError("invalid output register: %s(%d)\n", pos);
+			break;
+		case 'v': // Input attributes
+			if (outReg < 0x00 || outReg >= 0x0F)
+				return throwError("invalid input register: %s(%d)\n", pos);
 			break;
 		case 'r': // Temporary registers
 			outReg += 0x10;
@@ -805,6 +809,46 @@ DEF_COMMAND(formatmova)
 	return 0;
 }
 
+static inline int parseSetEmitFlags(char* flags, bool& isPrim, bool& isInv)
+{
+	isPrim = false;
+	isInv = false;
+	if (!flags)
+		return 0;
+
+	mystrtok_pos = flags;
+	while (char* flag = mystrtok_spc(NULL))
+	{
+		if (stricmp(flag, "prim")==0 || stricmp(flag, "primitive")==0)
+			isPrim = true;
+		else if (stricmp(flag, "inv")==0 || stricmp(flag, "invert")==0)
+			isInv = true;
+		else
+			throwError("unknown setemit flag: %s\n", flag);
+
+	}
+	return 0;
+}
+
+DEF_COMMAND(formatsetemit)
+{
+	NEXT_ARG(vtxIdStr);
+	NEXT_ARG_OPT(flagStr, NULL);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TO_INT(vtxId, vtxIdStr, 0, 3);
+	bool isPrim, isInv;
+	safe_call(parseSetEmitFlags(flagStr, isPrim, isInv));
+
+#ifdef DEBUG
+	printf("%s:%02X vtx%d, %s, %s\n", cmdName, opcode, vtxId, isPrim?"true":"false", isInv=?"true":"false");
+#endif
+	BUF.push_back(FMT_OPCODE(opcode) | ((u32)isInv<<22) | ((u32)isPrim<<23) | (vtxId<<24));
+	g_isGeoShader = true;
+
+	return 0;
+}
+
 DEF_COMMAND(formatcall)
 {
 	NEXT_ARG(procName);
@@ -967,6 +1011,7 @@ static const cmdTableType cmdTable[] =
 {
 	DEC_COMMAND(NOP, format0),
 	DEC_COMMAND(END, format0),
+	DEC_COMMAND(EMIT, format0),
 
 	DEC_COMMAND(ADD, format1),
 	DEC_COMMAND(DP3, format1),
@@ -1008,6 +1053,8 @@ static const cmdTableType cmdTable[] =
 
 	DEC_COMMAND(MADI, format5i),
 	DEC_COMMAND(MAD, format5),
+
+	DEC_COMMAND(SETEMIT, formatsetemit),
 
 	{ NULL, NULL },
 };

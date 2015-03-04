@@ -137,10 +137,10 @@ Reserves a new integer vector uniform to be preloaded with the specified constan
 ```
 Allocates a new output register, wires it to a certain output property and creates an alias for it that points to the allocated register. The following property names are supported:
 
-- `position` (or `pos`): In vertex shaders, this represents the position of the outputted vertex.
+- `position` (or `pos`): Represents the position of the outputted vertex.
 - `normalquat` (or `nquat`): Under investigation.
-- `color` (or `clr`): In vertex shaders, this represents the color of the outputted vertex. Its format is (R, G, B, xx) where R,G,B are values ranging from 0.0 to 1.0. The W component isn't used.
-- `texcoord0` (or `tcoord0`): In vertex shaders, this represents the texture coordinate that is fed to the Texture Unit 0. The Z and W components are not used.
+- `color` (or `clr`): Represents the color of the outputted vertex. Its format is (R, G, B, xx) where R,G,B are values ranging from 0.0 to 1.0. The W component isn't used.
+- `texcoord0` (or `tcoord0`): Represents the texture coordinate that is fed to the Texture Unit 0. The Z and W components are not used.
 - `texcoord0w` (or `tcoord0w`): Under investigation.
 - `texcoord1` (or `tcoord1`): As `texcoord0`, but for the Texture Unit 1.
 - `texcoord2` (or `tcoord2`): As `texcoord0`, but for the Texture Unit 2.
@@ -163,6 +163,8 @@ Syntax                            | Description
 --------------------------------- | -----------------------------------
 `nop`                             | No operation.
 `end`                             | Signals the end of the program.
+`emit`                            | (Geoshader-only) Emits a vertex configured by a prior `setemit`.
+`setemit vtxId, emitFlags         | (Geoshader-only) Configures a vertex for emission. The `emitFlags` parameter can be omitted.
 `add rDest, rSrc1, rSrc2`         |
 `dp3 rDest, rSrc1, rSrc2`         |
 `dp4 rDest, rSrc1, rSrc2`         |
@@ -217,3 +219,7 @@ Syntax                            | Description
 	- `flag1`: It tests a single flag.
 	- `flag1 && flag2`: It performs AND between the two flags. Optionally, a single `&` may be specified.
 	- `flag1 || flag2`: It performs OR between the two flags. Optionally, a single `|` may be specified.
+- `vtxId`: An integer ranging from 0 to 3 specifying the vertex ID used in geoshader vertex emission.
+- `emitFlags`: A space delimited combination of the following words:
+	- `primitive` (or `prim`): Specifies that after emitting the vertex, a primitive should also be emitted.
+	- `inv` (or `invert`): Specifies that the order of the vertices in the emitted primitive is inverted.
