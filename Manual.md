@@ -164,7 +164,7 @@ Syntax                            | Description
 `nop`                             | No operation.
 `end`                             | Signals the end of the program.
 `emit`                            | (Geoshader-only) Emits a vertex configured by a prior `setemit`.
-`setemit vtxId, emitFlags         | (Geoshader-only) Configures a vertex for emission. The `emitFlags` parameter can be omitted.
+`setemit vtxId, emitFlags`        | (Geoshader-only) Configures a vertex for emission. The `emitFlags` parameter can be omitted.
 `add rDest, rSrc1, rSrc2`         |
 `dp3 rDest, rSrc1, rSrc2`         |
 `dp4 rDest, rSrc1, rSrc2`         |
