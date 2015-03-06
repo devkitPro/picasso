@@ -161,7 +161,7 @@ int main(int argc, char* argv[])
 	for (int i = 0; i < g_uniformCount; i ++)
 	{
 		Uniform& u = g_uniformTable[i];
-		size_t l = strlen(u.name)+1;
+		size_t l = u.name.length()+1;
 		f.WriteWord(sp); sp += l;
 		f.WriteHword(u.pos-0x10);
 		f.WriteHword(u.pos+u.size-1-0x10);
@@ -176,9 +176,9 @@ int main(int argc, char* argv[])
 	// Write symbols
 	for (int i = 0; i < g_uniformCount; i ++)
 	{
-		const char* u = g_uniformTable[i].name;
-		size_t l = strlen(u)+1;
-		f.WriteRaw(u, l);
+		std::string& u = g_uniformTable[i].name;
+		size_t l = u.length()+1;
+		f.WriteRaw(u.c_str(), l);
 	}
 
 	if (hFile)
@@ -196,18 +196,19 @@ int main(int argc, char* argv[])
 		for (int i = 0; i < g_uniformCount; i ++)
 		{
 			Uniform& u = g_uniformTable[i];
+			const char* name = u.name.c_str();
 			if (u.type == UTYPE_FVEC)
-				fprintf(f2, "#define %s_FVEC_%s 0x%02X\n", prefix, u.name, u.pos-0x20);
+				fprintf(f2, "#define %s_FVEC_%s 0x%02X\n", prefix, name, u.pos-0x20);
 			else if (u.type == UTYPE_IVEC)
-				fprintf(f2, "#define %s_IVEC_%s 0x%02X\n", prefix, u.name, u.pos-0x80);
+				fprintf(f2, "#define %s_IVEC_%s 0x%02X\n", prefix, name, u.pos-0x80);
 			else if (u.type == UTYPE_BOOL)
 			{
 				if (u.size == 1)
-					fprintf(f2, "#define %s_FLAG_%s BIT(%d)\n", prefix, u.name, u.pos-0x88);
+					fprintf(f2, "#define %s_FLAG_%s BIT(%d)\n", prefix, name, u.pos-0x88);
 				else
-					fprintf(f2, "#define %s_FLAG_%s(_n) BIT(%d+(_n))\n", prefix, u.name, u.pos-0x88);
+					fprintf(f2, "#define %s_FLAG_%s(_n) BIT(%d+(_n))\n", prefix, name, u.pos-0x88);
 			}
-			fprintf(f2, "#define %s_ULEN_%s %d\n", prefix, u.name, u.size);
+			fprintf(f2, "#define %s_ULEN_%s %d\n", prefix, name, u.size);
 		}
 
 		fclose(f2);

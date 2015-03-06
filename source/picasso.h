@@ -101,7 +101,7 @@ enum
 
 struct Uniform
 {
-	const char* name;
+	std::string name;
 	int pos, size;
 	int type;
 };
