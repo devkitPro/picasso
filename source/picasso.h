@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <getopt.h>
 #ifdef WIN32
 #include <fcntl.h>
 #endif
