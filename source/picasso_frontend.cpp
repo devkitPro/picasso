@@ -33,43 +33,48 @@ int usage(const char* prog)
 {
 	fprintf(stderr,
 		"Usage:\n\n"
-		"%s shbinFile vshFile [hFile]\n", prog);
+		"%s output.shbin input1.pica input2.pica ...\n", prog);
 	return 0;
 }
 
 int main(int argc, char* argv[])
 {
-	if (argc < 3 || argc > 4)
+	if (argc < 3)
 		return usage(argv[0]);
 
 	char* shbinFile = argv[1];
-	char* vshFile = argv[2];
-	char* hFile = argc > 3 ? argv[3] : NULL;
+	//char* hFile = argc > 3 ? argv[3] : NULL;
 
 #ifdef WIN32
 	FixMinGWPath(shbinFile);
-	FixMinGWPath(vshFile);
-	FixMinGWPath(hFile);
+	//FixMinGWPath(hFile);
 #endif
 
-	char* sourceCode = StringFromFile(vshFile);
-	if (!sourceCode)
+	int rc = 0;
+	for (int i = 2; i < argc; i ++)
 	{
-		fprintf(stderr, "Cannot open input file!\n");
-		return 1;
+		char* vshFile = argv[i];
+
+#ifdef WIN32
+		FixMinGWPath(vshFile);
+#endif
+
+		char* sourceCode = StringFromFile(vshFile);
+		if (!sourceCode)
+		{
+			fprintf(stderr, "error: cannot open input file: %s\n");
+			return 1;
+		}
+
+		rc = AssembleString(sourceCode, vshFile);
+		free(sourceCode);
+		if (rc != 0)
+			return rc;
 	}
 
-	int rc = AssembleString(sourceCode, vshFile);
-	free(sourceCode);
+	rc = RelocateProduct();
 	if (rc != 0)
 		return rc;
-
-	procTableIter mainIt = g_procTable.find("main");
-	if (mainIt == g_procTable.end())
-	{
-		fprintf(stderr, "Error: main proc not defined\n");
-		return 1;
-	}
 
 	FileClass f(shbinFile, "wb");
 
@@ -79,54 +84,39 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+	u32 progSize = g_outputBuf.size();
+	u32 dvlpSize = 10*4 + progSize*4 + g_opdescCount*8;
+
+	// Write DVLB header
 	f.WriteWord(0x424C5644); // DVLB
-	f.WriteWord(1); // 1 DVLE
-	f.WriteWord(3*4 + 0x28); // offset to DVLE
+	f.WriteWord(g_totalDvleCount); // Number of DVLEs
 
-	u32 dvlpStart = f.Tell();
-	u32 shaderSize = g_outputBuf.size();
-	u32 paramStart = 0x28 + 0x40;
+	// Calculate and write DVLE offsets
+	u32 curOff = 2*4 + g_totalDvleCount*4 + dvlpSize;
+	for (dvleTableIter dvle = g_dvleTable.begin(); dvle != g_dvleTable.end(); ++dvle)
+	{
+		if (dvle->nodvle) continue;
+		f.WriteWord(curOff);
+		curOff += 16*4; // Header
+		curOff += dvle->constantSize;
+		curOff += dvle->outputCount*8;
+		curOff += dvle->uniformCount*8;
+		curOff += dvle->symbolSize;
+	}
 
+	// Write DVLP header
 	f.WriteWord(0x504C5644); // DVLP
 	f.WriteWord(0); // version
-	f.WriteWord(paramStart); // offset to shader binary blob
-	f.WriteWord(shaderSize); // size of shader binary blob
-	paramStart += shaderSize*4;
-	f.WriteWord(paramStart); // offset to opdesc table
+	f.WriteWord(10*4); // offset to shader binary blob
+	f.WriteWord(progSize); // size of shader binary blob
+	f.WriteWord(10*4 + progSize*4); // offset to opdesc table
 	f.WriteWord(g_opdescCount); // number of opdescs
-	paramStart += g_opdescCount*8;
-	f.WriteWord(paramStart); // offset to symtable (TODO)
+	f.WriteWord(dvlpSize); // offset to symtable (TODO)
 	f.WriteWord(0); // ????
 	f.WriteWord(0); // ????
 	f.WriteWord(0); // ????
-
-	u32 dvleStart = f.Tell();
-	paramStart -= dvleStart - dvlpStart;
-	
-	f.WriteWord(0x454C5644); // DVLE
-	f.WriteHword(0); // padding?
-	f.WriteHword(g_isGeoShader ? 1 : 0); // Shader type
-	f.WriteWord(mainIt->second.first); // offset to main
-	f.WriteWord(mainIt->second.first+mainIt->second.second); // offset to end of main
-	f.WriteWord(0); // ???
-	f.WriteWord(0); // ???
-	f.WriteWord(paramStart); // offset to constant table
-	f.WriteWord(g_constantCount); // size of constant table
-	paramStart += g_constantSize;
-	f.WriteWord(paramStart); // offset to label table (TODO)
-	f.WriteWord(0); // size of label table (TODO)
-	f.WriteWord(paramStart); // offset to output table
-	f.WriteWord(g_outputCount); // size of output table
-	paramStart += g_outputCount*8;
-	f.WriteWord(paramStart); // offset to uniform table
-	f.WriteWord(g_uniformCount); // size of uniform table
-	paramStart += g_uniformCount*8;
-	f.WriteWord(paramStart); // offset to symbol table
-	u32 temp = f.Tell();
-	f.WriteWord(0); // size of symbol table
 
 	// Write program
-	//for (u32 p : g_outputBuf)
 	for (outputBufIter it = g_outputBuf.begin(); it != g_outputBuf.end(); ++it)
 		f.WriteWord(*it);
 
@@ -134,53 +124,77 @@ int main(int argc, char* argv[])
 	for (int i = 0; i < g_opdescCount; i ++)
 		f.WriteDword(g_opdescTable[i]);
 
-	// Write constants
-	for (int i = 0; i < g_constantCount; i ++)
+	// Write DVLEs
+	for (dvleTableIter dvle = g_dvleTable.begin(); dvle != g_dvleTable.end(); ++dvle)
 	{
-		Constant& ct = g_constantTable[i];
-		f.WriteHword(ct.type);
-		if (ct.type == UTYPE_FVEC)
+		if (dvle->nodvle) continue;
+		curOff = 16*4;
+
+		f.WriteWord(0x454C5644); // DVLE
+		f.WriteHword(0); // padding?
+		f.WriteHword(dvle->isGeoShader ? 1 : 0); // Shader type
+		f.WriteWord(dvle->entryStart); // offset to main
+		f.WriteWord(dvle->entryEnd); // offset to end of main
+		f.WriteWord(0); // ???
+		f.WriteWord(0); // ???
+		f.WriteWord(curOff); // offset to constant table
+		f.WriteWord(dvle->constantCount); // size of constant table
+		curOff += dvle->constantSize;
+		f.WriteWord(curOff); // offset to label table (TODO)
+		f.WriteWord(0); // size of label table (TODO)
+		f.WriteWord(curOff); // offset to output table
+		f.WriteWord(dvle->outputCount); // size of output table
+		curOff += dvle->outputCount*8;
+		f.WriteWord(curOff); // offset to uniform table
+		f.WriteWord(dvle->uniformCount); // size of uniform table
+		curOff += dvle->uniformCount*8;
+		f.WriteWord(curOff); // offset to symbol table
+		u32 temp = f.Tell();
+		f.WriteWord(dvle->symbolSize); // size of symbol table
+
+		// Write constants
+		for (int i = 0; i < dvle->constantCount; i ++)
 		{
-			f.WriteHword(ct.regId-0x20);
-			for (int j = 0; j < 4; j ++)
-				f.WriteWord(f32tof24(ct.fparam[j]));
-		} else if (ct.type == UTYPE_IVEC)
+			Constant& ct = dvle->constantTable[i];
+			f.WriteHword(ct.type);
+			if (ct.type == UTYPE_FVEC)
+			{
+				f.WriteHword(ct.regId-0x20);
+				for (int j = 0; j < 4; j ++)
+					f.WriteWord(f32tof24(ct.fparam[j]));
+			} else if (ct.type == UTYPE_IVEC)
+			{
+				f.WriteHword(ct.regId-0x80);
+				for (int j = 0; j < 4; j ++)
+					f.WriteByte(ct.iparam[j]);
+			}
+		}
+
+		// Write outputs
+		for (int i = 0; i < dvle->outputCount; i ++)
+			f.WriteDword(dvle->outputTable[i]);
+
+		// Write uniforms
+		size_t sp = 0;
+		for (int i = 0; i < dvle->uniformCount; i ++)
 		{
-			f.WriteHword(ct.regId-0x80);
-			for (int j = 0; j < 4; j ++)
-				f.WriteByte(ct.iparam[j]);
+			Uniform& u = dvle->uniformTable[i];
+			size_t l = u.name.length()+1;
+			f.WriteWord(sp); sp += l;
+			f.WriteHword(u.pos-0x10);
+			f.WriteHword(u.pos+u.size-1-0x10);
+		}
+
+		// Write symbols
+		for (int i = 0; i < dvle->uniformCount; i ++)
+		{
+			std::string& u = dvle->uniformTable[i].name;
+			size_t l = u.length()+1;
+			f.WriteRaw(u.c_str(), l);
 		}
 	}
 
-	// Write outputs
-	for (int i = 0; i < g_outputCount; i ++)
-		f.WriteDword(g_outputTable[i]);
-
-	// Write uniforms
-	size_t sp = 0;
-	for (int i = 0; i < g_uniformCount; i ++)
-	{
-		Uniform& u = g_uniformTable[i];
-		size_t l = u.name.length()+1;
-		f.WriteWord(sp); sp += l;
-		f.WriteHword(u.pos-0x10);
-		f.WriteHword(u.pos+u.size-1-0x10);
-	}
-
-	// Write size of symbol table
-	u32 temp2 = f.Tell();
-	f.Seek(temp, SEEK_SET);
-	f.WriteWord(sp);
-	f.Seek(temp2, SEEK_SET);
-
-	// Write symbols
-	for (int i = 0; i < g_uniformCount; i ++)
-	{
-		std::string& u = g_uniformTable[i].name;
-		size_t l = u.length()+1;
-		f.WriteRaw(u.c_str(), l);
-	}
-
+#if 0
 	if (hFile)
 	{
 		FILE* f2 = fopen(hFile, "w");
@@ -213,6 +227,7 @@ int main(int argc, char* argv[])
 
 		fclose(f2);
 	}
+#endif
 
 	return 0;
 }

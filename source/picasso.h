@@ -58,10 +58,13 @@ enum
 	COND_UNK2,
 };
 
+//-----------------------------------------------------------------------------
+// Global data
+//-----------------------------------------------------------------------------
+
+// Output buffer
 typedef std::vector<u32> outputBufType;
 typedef outputBufType::iterator outputBufIter;
-
-extern bool g_isGeoShader;
 extern outputBufType g_outputBuf;
 
 enum
@@ -87,6 +90,7 @@ struct StackEntry
 extern StackEntry g_stack[MAX_STACK];
 extern int g_stackPos;
 
+// Operand descriptor stuff.
 #define MAX_OPDESC 128
 extern int g_opdescTable[MAX_OPDESC];
 extern int g_opdeskMasks[MAX_OPDESC]; // used to keep track of used bits
@@ -106,9 +110,44 @@ struct Uniform
 	int type;
 };
 
+// List of uniforms
 #define MAX_UNIFORM 0x60
 extern Uniform g_uniformTable[MAX_UNIFORM];
 extern int g_uniformCount;
+
+struct DVLEData; // Forward declaration
+
+typedef std::pair<size_t, size_t> procedure; // position, size
+typedef std::pair<size_t, std::string> relocation; // position, name
+
+typedef std::map<std::string, procedure> procTableType;
+typedef std::map<std::string, size_t> labelTableType;
+typedef std::map<std::string, int> aliasTableType;
+typedef std::vector<relocation> relocTableType;
+typedef std::list<DVLEData> dvleTableType;
+
+typedef procTableType::iterator procTableIter;
+typedef labelTableType::iterator labelTableIter;
+typedef aliasTableType::iterator aliasTableIter;
+typedef relocTableType::iterator relocTableIter;
+typedef dvleTableType::iterator dvleTableIter;
+
+extern procTableType g_procTable;
+extern dvleTableType g_dvleTable;
+extern relocTableType g_procRelocTable;
+extern int g_totalDvleCount;
+
+// The following are cleared before each file is processed
+extern labelTableType g_labels;
+extern relocTableType g_labelRelocTable;
+extern aliasTableType g_aliases;
+
+int AssembleString(char* str, const char* initialFilename);
+int RelocateProduct(void);
+
+//-----------------------------------------------------------------------------
+// Local data
+//-----------------------------------------------------------------------------
 
 enum
 {
@@ -123,10 +162,6 @@ enum
 	OUTTYPE_VIEW,
 };
 
-#define MAX_OUTPUT 8
-extern u64 g_outputTable[MAX_OUTPUT];
-extern int g_outputCount;
-
 struct Constant
 {
 	int regId;
@@ -138,33 +173,32 @@ struct Constant
 	};
 };
 
-#define MAX_CONSTANT 0x60
-extern Constant g_constantTable[MAX_CONSTANT];
-extern int g_constantCount;
-extern size_t g_constantSize;
-
-struct Relocation
+struct DVLEData
 {
-	size_t instPos;
-	const char* target;
-	bool isProc;
+	// General config
+	std::string filename;
+	std::string entrypoint;
+	size_t entryStart, entryEnd;
+	bool nodvle, isGeoShader;
+
+	// Uniforms
+	Uniform uniformTable[MAX_UNIFORM];
+	int uniformCount;
+	size_t symbolSize;
+
+	// Constants
+	#define MAX_CONSTANT 0x60
+	Constant constantTable[MAX_CONSTANT];
+	int constantCount;
+	size_t constantSize;
+
+	// Outputs
+	#define MAX_OUTPUT 8
+	u64 outputTable[MAX_OUTPUT];
+	int outputCount;
+
+	DVLEData(const char* filename) :
+		filename(filename), entrypoint("main"),
+		nodvle(false), isGeoShader(false),
+		uniformCount(0), symbolSize(0), constantCount(0), constantSize(0), outputCount(0) { }
 };
-
-typedef std::pair<size_t, size_t> procedure; // position, size
-
-typedef std::map<std::string, procedure> procTableType;
-typedef std::map<std::string, size_t> labelTableType;
-typedef std::map<std::string, int> aliasTableType;
-typedef std::vector<Relocation> relocTableType;
-
-typedef procTableType::iterator procTableIter;
-typedef labelTableType::iterator labelTableIter;
-typedef aliasTableType::iterator aliasTableIter;
-typedef relocTableType::iterator relocTableIter;
-
-extern procTableType g_procTable;
-extern labelTableType g_labels;
-extern aliasTableType g_aliases;
-extern relocTableType g_relocs;
-
-int AssembleString(char* str, const char* initialFilename);

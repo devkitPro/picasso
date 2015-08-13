@@ -19,21 +19,63 @@ int g_opdescMasks[MAX_OPDESC];
 
 Uniform g_uniformTable[MAX_UNIFORM];
 int g_uniformCount;
-static int fvecUnifPos = 0x20;
-static int ivecUnifPos = 0x80;
-static int boolUnifPos = 0x88;
 
-Constant g_constantTable[MAX_CONSTANT];
-int g_constantCount;
-size_t g_constantSize;
+class UniformAlloc
+{
+	int start, end, bound, tend;
+public:
+	UniformAlloc(int start, int end) : start(start), end(end), bound(end), tend(end) { }
+	void ClearLocal(void) { end = tend; }
+	int AllocGlobal(int size)
+	{
+		if ((start+size) > bound) return -1;
+		int ret = start;
+		start += size;
+		return ret;
+	}
+	int AllocLocal(int size)
+	{
+		int pos = end - size;
+		if (pos < start) return -1;
+		bound = pos < bound ? pos : bound;
+		return pos;
+	}
+};
 
-u64 g_outputTable[MAX_OUTPUT];
-int g_outputCount;
+static UniformAlloc fvecAlloc(0x20, 0x80), ivecAlloc(0x80, 0x84), boolAlloc(0x88, 0x98);
 
 procTableType g_procTable;
+dvleTableType g_dvleTable;
+relocTableType g_procRelocTable;
+int g_totalDvleCount;
+
 labelTableType g_labels;
+relocTableType g_labelRelocTable;
 aliasTableType g_aliases;
-relocTableType g_relocs;
+
+static DVLEData* curDvle;
+
+static void ClearStatus(void)
+{
+	fvecAlloc.ClearLocal();
+	ivecAlloc.ClearLocal();
+	boolAlloc.ClearLocal();
+	g_labels.clear();
+	g_labelRelocTable.clear();
+	g_aliases.clear();
+	curDvle = NULL;
+}
+
+static DVLEData* GetDvleData(void)
+{
+	if (!curDvle)
+	{
+		g_dvleTable.push_back( DVLEData(curFile) );
+		curDvle = &g_dvleTable.back();
+		g_totalDvleCount ++;
+	}
+	return curDvle;
+}
 
 static char* mystrtok_pos;
 static char* mystrtok(char* str, const char* delim)
@@ -126,12 +168,14 @@ static int parseInt(char* pos, int& out, long long min, long long max)
 	} while(0)
 
 static int ProcessCommand(const char* cmd);
-static int FixupRelocations();
+static int FixupLabelRelocations();
 
 int AssembleString(char* str, const char* initialFilename)
 {
 	curFile = initialFilename;
 	curLine = 1;
+
+	ClearStatus();
 
 	int nextLineIncr = 0;
 	char* nextStr = NULL;
@@ -192,35 +236,55 @@ int AssembleString(char* str, const char* initialFilename)
 	if (g_stackPos)
 		return throwError("unclosed block(s)\n");
 
-	safe_call(FixupRelocations());
+	safe_call(FixupLabelRelocations());
 	
 	return 0;
 }
 
-int FixupRelocations()
+int FixupLabelRelocations()
 {
-	for (relocTableIter it = g_relocs.begin(); it != g_relocs.end(); ++it)
+	for (relocTableIter it = g_labelRelocTable.begin(); it != g_labelRelocTable.end(); ++it)
 	{
-		Relocation& r = *it;
-		u32& inst = BUF[r.instPos];
-		if (r.isProc)
-		{
-			procTableIter proc = g_procTable.find(r.target);
-			if (proc == g_procTable.end())
-				return throwError("procedure '%s' is undefined\n", r.target);
-			u32 dst = proc->second.first;
-			u32 num = proc->second.second;
-			inst &= ~0x3FFFFF;
-			inst |= num | (dst << 10);
-		} else
-		{
-			labelTableIter lbl = g_labels.find(r.target);
-			if (lbl == g_labels.end())
-				return throwError("label '%s' is undefined\n", r.target);
-			u32 dst = lbl->second;
-			inst &= ~(0xFFF << 10);
-			inst |= dst << 10;
-		}
+		relocation& r = *it;
+		u32& inst = BUF[r.first];
+		labelTableIter lbl = g_labels.find(r.second);
+		if (lbl == g_labels.end())
+			return throwError("label '%s' is undefined\n", r.second.c_str());
+		u32 dst = lbl->second;
+		inst &= ~(0xFFF << 10);
+		inst |= dst << 10;
+	}
+	return 0;
+}
+
+int RelocateProduct()
+{
+	for (relocTableIter it = g_procRelocTable.begin(); it != g_procRelocTable.end(); ++it)
+	{
+		relocation& r = *it;
+		u32& inst = BUF[r.first];
+		procTableIter proc = g_procTable.find(r.second);
+		if (proc == g_procTable.end())
+			return throwError("procedure '%s' is undefined\n", r.second.c_str());
+		u32 dst = proc->second.first;
+		u32 num = proc->second.second;
+		inst &= ~0x3FFFFF;
+		inst |= num | (dst << 10);
+	}
+
+	if (g_totalDvleCount == 0)
+		return throwError("no DVLEs can be generated from the given input file(s)\n");
+
+	for (dvleTableIter it = g_dvleTable.begin(); it != g_dvleTable.end(); ++it)
+	{
+		if (it->nodvle) continue;
+		curFile = it->filename.c_str();
+		curLine = 1;
+		procTableIter mainIt = g_procTable.find(it->entrypoint);
+		if (mainIt == g_procTable.end())
+			return throwError("entrypoint '%s' is undefined\n", it->entrypoint.c_str());
+		it->entryStart = mainIt->second.first;
+		it->entryEnd = it->entryStart + mainIt->second.second;
 	}
 	return 0;
 }
@@ -422,12 +486,16 @@ static int parseSwizzling(const char* b)
 	return out<<1;
 }
 
-static int maskFromSwizzling(int sw)
+static int maskFromSwizzling(int sw, bool reverse = true)
 {
 	sw >>= 1; // get rid of negation bit
 	int out = 0;
 	for (int i = 0; i < 4; i ++)
-		out |= BIT(3-((sw>>(i*2))&3));
+	{
+		int bitid = (sw>>(i*2))&3;
+		if (reverse) bitid = 3 - bitid;
+		out |= BIT(bitid);
+	}
 	return out;
 }
 
@@ -841,10 +909,10 @@ DEF_COMMAND(formatsetemit)
 	safe_call(parseSetEmitFlags(flagStr, isPrim, isInv));
 
 #ifdef DEBUG
-	printf("%s:%02X vtx%d, %s, %s\n", cmdName, opcode, vtxId, isPrim?"true":"false", isInv=?"true":"false");
+	printf("%s:%02X vtx%d, %s, %s\n", cmdName, opcode, vtxId, isPrim?"true":"false", isInv?"true":"false");
 #endif
 	BUF.push_back(FMT_OPCODE(opcode) | ((u32)isInv<<22) | ((u32)isPrim<<23) | (vtxId<<24));
-	g_isGeoShader = true;
+	GetDvleData()->isGeoShader = true;
 
 	return 0;
 }
@@ -856,11 +924,7 @@ DEF_COMMAND(formatcall)
 
 	ARG_TARGET(procName);
 
-	Relocation r;
-	r.instPos = BUF.size();
-	r.target = procName;
-	r.isProc = true;
-	g_relocs.push_back(r);
+	g_procRelocTable.push_back( std::make_pair(BUF.size(), procName) );
 
 	BUF.push_back(FMT_OPCODE(opcode));
 
@@ -919,11 +983,8 @@ DEF_COMMAND(format2)
 
 			ARG_TARGET(targetName);
 
-			Relocation r;
-			r.instPos = BUF.size();
-			r.target = targetName;
-			r.isProc = opcode==MAESTRO_CALLC;
-			g_relocs.push_back(r);
+			relocTableType& rt = opcode==MAESTRO_CALLC ? g_procRelocTable : g_labelRelocTable;
+			rt.push_back( std::make_pair(BUF.size(), targetName) );
 
 #ifdef DEBUG
 			printf("%s:%02X %s, %s\n", cmdName, opcode, condExp, targetName);
@@ -971,11 +1032,8 @@ DEF_COMMAND(format3)
 
 			ARG_TARGET(targetName);
 
-			Relocation r;
-			r.instPos = BUF.size();
-			r.target = targetName;
-			r.isProc = opcode==MAESTRO_CALLU;
-			g_relocs.push_back(r);
+			relocTableType& rt = opcode==MAESTRO_CALLU ? g_procRelocTable : g_labelRelocTable;
+			rt.push_back( std::make_pair(BUF.size(), targetName) );
 
 #ifdef DEBUG
 			printf("%s:%02X d%02X, %s\n", cmdName, opcode, regId, targetName);
@@ -1185,21 +1243,20 @@ DEF_DIRECTIVE(alias)
 	return 0;
 }
 
-static inline int& getAllocVar(int type, int& bound)
+static inline UniformAlloc& getAlloc(int type)
 {
 	switch (type)
 	{
 		default:
-		case UTYPE_FVEC: bound = 0x80; return fvecUnifPos;
-		case UTYPE_IVEC: bound = 0x84; return ivecUnifPos;
-		case UTYPE_BOOL: bound = 0x98; return boolUnifPos;
+		case UTYPE_FVEC: return fvecAlloc;
+		case UTYPE_IVEC: return ivecAlloc;
+		case UTYPE_BOOL: return boolAlloc;
 	}
 }
 
 DEF_DIRECTIVE(uniform)
 {
-	int bound;
-	int& uniformPos = getAllocVar(dirParam, bound);
+	UniformAlloc& alloc = getAlloc(dirParam);
 
 	for (;;)
 	{
@@ -1222,12 +1279,36 @@ DEF_DIRECTIVE(uniform)
 		}
 		if (!validateIdentifier(argText))
 			return throwError("invalid uniform name: %s\n", argText);
-		if ((uniformPos+uSize) >= bound)
-			return throwError("not enough uniform registers: %s[%d]\n", argText, uSize);
-		if (g_uniformCount == MAX_UNIFORM)
-			return throwError("too many uniforms: %s[%d]\n", argText, uSize);
 		if (g_aliases.find(argText) != g_aliases.end())
 			return duplicateIdentifier(argText);
+
+		int uniformPos = -1;
+
+		// Find the uniform in the table
+		int i;
+		for (i = 0; i < g_uniformCount; i ++)
+		{
+			Uniform& uniform = g_uniformTable[i];
+			if (uniform.name == argText)
+			{
+				if (uniform.type != dirParam)
+					return throwError("mismatched uniform type: %s\n", argText);
+				if (uniform.size != uSize)
+					return throwError("uniform '%s' previously declared as having size %d\n", argText, uniform.size);
+				break;
+			}
+		}
+
+		// If not found, create it
+		if (i == g_uniformCount && uniformPos < 0)
+		{
+			if (g_uniformCount == MAX_UNIFORM)
+				return throwError("too many global uniforms: %s\n", argText);
+
+			uniformPos = alloc.AllocGlobal(uSize);
+			if (uniformPos < 0)
+				return throwError("not enough uniform space: %s[%d]\n", argText, uSize);
+		}
 
 		Uniform& uniform = g_uniformTable[g_uniformCount++];
 		uniform.name = argText;
@@ -1235,6 +1316,18 @@ DEF_DIRECTIVE(uniform)
 		uniform.size = uSize;
 		uniform.type = dirParam;
 		uniformPos += uSize;
+
+		if (*argText != '_')
+		{
+			DVLEData* dvle = GetDvleData();
+
+			// Add the uniform to the table
+			if (dvle->uniformCount == MAX_UNIFORM)
+				return throwError("too many referenced uniforms: %s\n", argText);
+			dvle->uniformTable[dvle->uniformCount++] = uniform; // Copy constructor
+			dvle->symbolSize += strlen(argText)+1;
+		}
+
 		g_aliases.insert( std::pair<std::string,int>(argText, uniform.pos | (DEFAULT_OPSRC<<8)) );
 
 #ifdef DEBUG
@@ -1246,8 +1339,8 @@ DEF_DIRECTIVE(uniform)
 
 DEF_DIRECTIVE(const)
 {
-	int bound;
-	int& uniformPos = getAllocVar(dirParam, bound);
+	DVLEData* dvle = GetDvleData();
+	UniformAlloc& alloc = getAlloc(dirParam);
 
 	NEXT_ARG_CPAREN(constName);
 	NEXT_ARG(arg0Text);
@@ -1260,14 +1353,18 @@ DEF_DIRECTIVE(const)
 	*parenPos = 0;
 	arg3Text = trim_whitespace(arg3Text);
 
-	if (g_constantCount == MAX_CONSTANT || uniformPos>=bound)
-		return throwError("not enough space for constant\n");
-
 	if (g_aliases.find(constName) != g_aliases.end())
 		return duplicateIdentifier(constName);
 
-	Constant& ct = g_constantTable[g_constantCount++];
-	ct.regId = uniformPos++;
+	int uniformPos = alloc.AllocLocal(1);
+	if (uniformPos < 0)
+		return throwError("not enough space for local constant '%s'\n", constName);
+
+	if (dvle->constantCount == MAX_CONSTANT)
+		return throwError("too many local constants\n");
+
+	Constant& ct = dvle->constantTable[dvle->constantCount++];
+	ct.regId = uniformPos;
 	ct.type = dirParam;
 	if (dirParam == UTYPE_FVEC)
 	{
@@ -1275,14 +1372,14 @@ DEF_DIRECTIVE(const)
 		ct.fparam[1] = atof(arg1Text);
 		ct.fparam[2] = atof(arg2Text);
 		ct.fparam[3] = atof(arg3Text);
-		g_constantSize += 4 + 4*4;
+		dvle->constantSize += 4 + 4*4;
 	} else if (dirParam == UTYPE_IVEC)
 	{
 		ct.iparam[0] = atoi(arg0Text) & 0xFF;
 		ct.iparam[1] = atoi(arg1Text) & 0xFF;
 		ct.iparam[2] = atoi(arg2Text) & 0xFF;
 		ct.iparam[3] = atoi(arg3Text) & 0xFF;
-		g_constantSize += 4 + 4;
+		dvle->constantSize += 4 + 4;
 	}
 
 	g_aliases.insert( std::pair<std::string,int>(constName, ct.regId | (DEFAULT_OPSRC<<8)) );
@@ -1321,6 +1418,8 @@ static int parseOutType(const char* text)
 
 DEF_DIRECTIVE(out)
 {
+	DVLEData* dvle = GetDvleData();
+
 	NEXT_ARG_SPC(outName);
 	NEXT_ARG_SPC(outType);
 	ENSURE_NO_MORE_ARGS();
@@ -1337,26 +1436,52 @@ DEF_DIRECTIVE(out)
 		if (sw < 0)
 			return throwError("invalid output mask: %s\n", dotPos);
 	}
-	int mask = maskFromSwizzling(sw);
+	int mask = maskFromSwizzling(sw, false);
 	int type = parseOutType(outType);
 	if (type < 0)
 		return throwError("invalid output type: %s\n", outType);
 
-	if (g_outputCount==MAX_OUTPUT)
+	if (dvle->outputCount==MAX_OUTPUT)
 		return throwError("too many outputs\n");
 
 	if (g_aliases.find(outName) != g_aliases.end())
 		return duplicateIdentifier(outName);
 
-	int oid = g_outputCount;
+	int oid = dvle->outputCount;
 
 #ifdef DEBUG
 	printf("output %s <- o%d (%d:%X)\n", outName, oid, type, mask);
 #endif
 
-	g_outputTable[g_outputCount++] = OUTPUT_MAKE(type, oid, mask);
+	dvle->outputTable[dvle->outputCount++] = OUTPUT_MAKE(type, oid, mask);
 	g_aliases.insert( std::pair<std::string,int>(outName, oid | (sw<<8)) );
 	return 0;
+}
+
+DEF_DIRECTIVE(entry)
+{
+	DVLEData* dvle = GetDvleData();
+
+	NEXT_ARG_SPC(entrypoint);
+	ENSURE_NO_MORE_ARGS();
+
+	if (!validateIdentifier(entrypoint))
+		return throwError("invalid identifier: %s\n", entrypoint);
+
+	dvle->entrypoint = entrypoint;
+	return 0;
+}
+
+DEF_DIRECTIVE(nodvle)
+{
+	DVLEData* dvle = GetDvleData();
+	ENSURE_NO_MORE_ARGS();
+
+	if (!dvle->nodvle)
+	{
+		dvle->nodvle = true;
+		g_totalDvleCount --;
+	}
 }
 
 static const cmdTableType dirTable[] =
@@ -1371,6 +1496,8 @@ static const cmdTableType dirTable[] =
 	DEC_DIRECTIVE2(constf, const, UTYPE_FVEC),
 	DEC_DIRECTIVE2(consti, const, UTYPE_IVEC),
 	DEC_DIRECTIVE(out),
+	DEC_DIRECTIVE(entry),
+	DEC_DIRECTIVE(nodvle),
 	{ NULL, NULL },
 };
 
