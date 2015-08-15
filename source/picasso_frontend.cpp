@@ -59,6 +59,7 @@ int main(int argc, char* argv[])
 		{
 			case 'o': shbinFile = optarg; break;
 			case 'h': hFile     = optarg; break;
+			case '?':        usage(argv[0]); return EXIT_SUCCESS;
 			default:  return usage(argv[0]);
 		}
 	}
@@ -132,6 +133,7 @@ int main(int argc, char* argv[])
 		curOff += dvle->outputCount*8;
 		curOff += dvle->uniformCount*8;
 		curOff += dvle->symbolSize;
+		curOff  = (curOff + 3) &~ 3; // Word alignment
 	}
 
 	// Write DVLP header
@@ -222,6 +224,12 @@ int main(int argc, char* argv[])
 			size_t l = u.length()+1;
 			f.WriteRaw(u.c_str(), l);
 		}
+
+		// Word alignment
+		int pos = f.Tell();
+		int pad = ((pos+3)&~3)-pos;
+		for (int i = 0; i < pad; i ++)
+			f.WriteByte(0);
 	}
 
 	if (hFile)
