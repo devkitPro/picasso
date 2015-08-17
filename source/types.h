@@ -24,6 +24,7 @@ typedef uint8_t u8;
 #define __ORDER_BIG_ENDIAN__ BIG_ENDIAN
 #endif
 
+#ifndef __llvm__
 static inline uint16_t __builtin_bswap16(uint16_t x)
 {
 	return ((x << 8) & 0xff00) | ((x >> 8) & 0x00ff);
@@ -42,6 +43,7 @@ static inline uint64_t __builtin_bswap64(uint64_t x)
 	return (uint64_t)__builtin_bswap32(x>>32) |
 	      ((uint64_t)__builtin_bswap32(x&0xFFFFFFFF) << 32);
 }
+#endif
 #endif
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
