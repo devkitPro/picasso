@@ -316,8 +316,8 @@ static int missingParam()
 typedef struct
 {
 	const char* name;
-	int (* func) (const char*, int);
-	int opcode;
+	int (* func) (const char*, int, int);
+	int opcode, opcodei;
 } cmdTableType;
 
 #define NEXT_ARG(_varName) char* _varName; do \
@@ -345,19 +345,23 @@ typedef struct
 	} while (0)
 
 #define DEF_COMMAND(name) \
-	static int cmd_##name(const char* cmdName, int opcode)
+	static int cmd_##name(const char* cmdName, int opcode, int opcodei)
 
 #define DEC_COMMAND(name, fun) \
-	{ #name, cmd_##fun, MAESTRO_##name }
+	{ #name, cmd_##fun, MAESTRO_##name, -1 }
+
+#define DEC_COMMAND2(name, fun) \
+	{ #name, cmd_##fun, MAESTRO_##name, MAESTRO_##name##I }, \
+	{ #name "i", cmd_##fun, MAESTRO_##name, MAESTRO_##name##I }
 
 #define DEF_DIRECTIVE(name) \
-	static int dir_##name(const char* cmdName, int dirParam)
+	static int dir_##name(const char* cmdName, int dirParam, int _unused)
 
 #define DEC_DIRECTIVE(name) \
-	{ #name, dir_##name, 0 }
+	{ #name, dir_##name, 0, 0 }
 
 #define DEC_DIRECTIVE2(name, fun, opc) \
-	{ #name, dir_##fun, opc }
+	{ #name, dir_##fun, opc, 0 }
 
 static int ensureNoMoreArgs()
 {
@@ -383,17 +387,24 @@ static inline int ensure_valid_dest(int reg, const char* name)
 	return 0;
 }
 
-static inline int ensure_valid_src1(int reg, const char* name)
+static inline int ensure_valid_src_wide(int reg, const char* name, int srcId)
 {
 	if (reg < 0x00 || reg >= 0x80)
-		return throwError("invalid source1 register: %s\n", name);
+		return throwError("invalid source%d register: %s\n", srcId, name);
 	return 0;
 }
 
-static inline int ensure_valid_src2(int reg, const char* name)
+static inline int ensure_valid_src_narrow(int reg, const char* name, int srcId)
 {
 	if (reg < 0x00 || reg >= 0x20)
-		return throwError("invalid source2 register: %s\n", name);
+		return throwError("invalid source%d register: %s\n", srcId, name);
+	return 0;
+}
+
+static inline int ensure_no_idxreg(int idxreg, int srcId)
+{
+	if (idxreg > 0)
+		return throwError("index register not allowed in source%d\n", srcId);
 	return 0;
 }
 
@@ -445,15 +456,15 @@ static inline int ensure_valid_condop(int condop, const char* name)
 
 #define ARG_TO_SRC1_REG(_reg, _name) \
 	ARG_TO_REG(_reg, _name); \
-	safe_call(ensure_valid_src1(_reg, _name))
+	safe_call(ensure_valid_src_wide(_reg, _name, 1))
 
 #define ARG_TO_SRC1_REG2(_reg, _name) \
 	ARG_TO_REG2(_reg, _name); \
-	safe_call(ensure_valid_src1(_reg, _name))
+	safe_call(ensure_valid_src_wide(_reg, _name, 1))
 
 #define ARG_TO_SRC2_REG(_reg, _name) \
 	ARG_TO_REG(_reg, _name); \
-	safe_call(ensure_valid_src2(_reg, _name))
+	safe_call(ensure_valid_src_narrow(_reg, _name, 2))
 
 #define ARG_TO_IREG(_reg, _name) \
 	ARG_TO_REG(_reg, _name); \
@@ -725,8 +736,22 @@ DEF_COMMAND(format1)
 	ENSURE_NO_MORE_ARGS();
 
 	ARG_TO_DEST_REG(rDest, destName);
-	ARG_TO_SRC1_REG2(rSrc1, src1Name);
-	ARG_TO_SRC2_REG(rSrc2, src2Name);
+	ARG_TO_REG2(rSrc1, src1Name);
+	ARG_TO_REG2(rSrc2, src2Name);
+
+	bool inverted = opcodei >= 0 && rSrc1 < 0x20 && rSrc2 >= 0x20;
+
+	if (!inverted)
+	{
+		safe_call(ensure_valid_src_wide(rSrc1, src1Name, 1));
+		safe_call(ensure_valid_src_narrow(rSrc2, src2Name, 2));
+		safe_call(ensure_no_idxreg(rSrc2Idx, 2));
+	} else
+	{
+		safe_call(ensure_valid_src_narrow(rSrc1, src1Name, 1));
+		safe_call(ensure_no_idxreg(rSrc1Idx, 1));
+		safe_call(ensure_valid_src_wide(rSrc2, src2Name, 2));
+	}
 
 	int opdesc = 0;
 	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_D12));
@@ -734,29 +759,10 @@ DEF_COMMAND(format1)
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, opdesc);
 #endif
-	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc2<<7) | (rSrc1<<12) | (rSrc1Idx<<19) | (rDest<<21));
-
-	return 0;
-}
-
-DEF_COMMAND(format1i)
-{
-	NEXT_ARG(destName);
-	NEXT_ARG(src1Name);
-	NEXT_ARG(src2Name);
-	ENSURE_NO_MORE_ARGS();
-
-	ARG_TO_DEST_REG(rDest, destName);
-	ARG_TO_SRC2_REG(rSrc1, src1Name);
-	ARG_TO_SRC1_REG2(rSrc2, src2Name);
-
-	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_D12));
-
-#ifdef DEBUG
-	printf("%s:%02X d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, opdesc);
-#endif
-	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc2<<7) | (rSrc1<<14) | (rSrc2Idx<<19) | (rDest<<21));
+	if (!inverted)
+		BUF.push_back(FMT_OPCODE(opcode)  | opdesc | (rSrc2<<7) | (rSrc1<<12) | (rSrc1Idx<<19) | (rDest<<21));
+	else
+		BUF.push_back(FMT_OPCODE(opcodei) | opdesc | (rSrc2<<7) | (rSrc1<<14) | (rSrc2Idx<<19) | (rDest<<21));
 
 	return 0;
 }
@@ -815,8 +821,20 @@ DEF_COMMAND(format5)
 
 	ARG_TO_DEST_REG(rDest, destName);
 	ARG_TO_SRC1_REG(rSrc1, src1Name);
-	ARG_TO_SRC1_REG(rSrc2, src2Name);
-	ARG_TO_SRC2_REG(rSrc3, src3Name);
+	ARG_TO_REG(rSrc2, src2Name);
+	ARG_TO_REG(rSrc3, src3Name);
+
+	bool inverted = opcodei >= 0 && rSrc2 < 0x20 && rSrc3 >= 0x20;
+
+	if (!inverted)
+	{
+		safe_call(ensure_valid_src_wide(rSrc2, src2Name, 2));
+		safe_call(ensure_valid_src_narrow(rSrc3, src3Name, 3));
+	} else
+	{
+		safe_call(ensure_valid_src_narrow(rSrc2, src2Name, 2));
+		safe_call(ensure_valid_src_wide(rSrc3, src3Name, 3));
+	}
 
 	int opdesc = 0;
 	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
@@ -827,34 +845,10 @@ DEF_COMMAND(format5)
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
 #endif
-	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc3<<5) | (rSrc2<<10) | (rSrc1<<17) | (rDest<<24));
-
-	return 0;
-}
-
-DEF_COMMAND(format5i)
-{
-	NEXT_ARG(destName);
-	NEXT_ARG(src1Name);
-	NEXT_ARG(src2Name);
-	NEXT_ARG(src3Name);
-	ENSURE_NO_MORE_ARGS();
-
-	ARG_TO_DEST_REG(rDest, destName);
-	ARG_TO_SRC1_REG(rSrc1, src1Name);
-	ARG_TO_SRC2_REG(rSrc2, src2Name);
-	ARG_TO_SRC1_REG(rSrc3, src3Name);
-
-	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
-
-	if (opdesc >= 32)
-		return throwError("opdesc allocation error\n");
-
-#ifdef DEBUG
-	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
-#endif
-	BUF.push_back(FMT_OPCODE(opcode) | opdesc | (rSrc3<<5) | (rSrc2<<12) | (rSrc1<<17) | (rDest<<24));
+	if (!inverted)
+		BUF.push_back(FMT_OPCODE(opcode)  | opdesc | (rSrc3<<5) | (rSrc2<<10) | (rSrc1<<17) | (rDest<<24));
+	else
+		BUF.push_back(FMT_OPCODE(opcodei) | opdesc | (rSrc3<<5) | (rSrc2<<12) | (rSrc1<<17) | (rDest<<24));
 
 	return 0;
 }
@@ -1074,16 +1068,12 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(ADD, format1),
 	DEC_COMMAND(DP3, format1),
 	DEC_COMMAND(DP4, format1),
-	DEC_COMMAND(DPH, format1),
+	DEC_COMMAND2(DPH, format1),
 	DEC_COMMAND(MUL, format1),
-	DEC_COMMAND(SGE, format1),
-	DEC_COMMAND(SLT, format1),
+	DEC_COMMAND2(SGE, format1),
+	DEC_COMMAND2(SLT, format1),
 	DEC_COMMAND(MAX, format1),
 	DEC_COMMAND(MIN, format1),
-
-	DEC_COMMAND(DPHI, format1i),
-	DEC_COMMAND(SGEI, format1i),
-	DEC_COMMAND(SLTI, format1i),
 
 	DEC_COMMAND(EX2, format1u),
 	DEC_COMMAND(LG2, format1u),
@@ -1109,8 +1099,7 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(IFU, format3),
 	DEC_COMMAND(JMPU, format3),
 
-	DEC_COMMAND(MADI, format5i),
-	DEC_COMMAND(MAD, format5),
+	DEC_COMMAND2(MAD, format5),
 
 	DEC_COMMAND(SETEMIT, formatsetemit),
 
@@ -1513,7 +1502,7 @@ int ProcessCommand(const char* cmd)
 
 	for (int i = 0; table[i].name; i ++)
 		if (stricmp(table[i].name, cmd) == 0)
-			return table[i].func(cmd, table[i].opcode);
+			return table[i].func(cmd, table[i].opcode, table[i].opcodei);
 
 	return throwError("invalid instruction: %s\n", cmd);
 }
