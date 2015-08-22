@@ -28,8 +28,6 @@ Procedures are delimited using the `.proc` and `.end` directives. E.g.
 .end
 ```
 
-A valid PICA200 shader must contain a `main` procedure.
-
 Instructions consist of an opcode name and a comma-delimited list of arguments.
 
 Directives are special statements that start with a period and control certain aspects of `picasso`'s code emission; such as defining procedures, uniforms, constants and more.
@@ -43,7 +41,7 @@ PICA200 registers are often used as arguments to instructions. There exist the f
 - `i0` through `i3`: Integer vector uniforms (special purpose).
 - `b0` through `b15`: Boolean uniforms (special purpose).
 
-All registers contain 32-bit floating point vectors; except for integer vector uniforms (containing 8-bit integers) and boolean uniforms. Vectors have 4 components: x, y, z and w. Uniforms are special registers that are writable by the CPU; thus they are used to pass configuration parameters to the shader such as transformation matrices. Sometimes they are preloaded with constant values that may be used in the logic of the shader.
+All registers contain floating point vectors (it is currently unknown whether they are 24-bit or 32-bit); except for integer vector uniforms (containing 8-bit integers) and boolean uniforms. Vectors have 4 components: x, y, z and w. Uniforms are special registers that are writable by the CPU; thus they are used to pass configuration parameters to the shader such as transformation matrices. Sometimes they are preloaded with constant values that may be used in the logic of the shader.
 
 In most situations, vectors may be [swizzled](http://en.wikipedia.org/wiki/Swizzling_%28computer_graphics%29), that is; their components may be rearranged. Register arguments support specifying a swizzling mask: `r0.wwxy`. The swizzling mask usually has 4 components (but not more), if it has less the last component is repeated to fill the mask. The default mask applied to registers is `xyzw`; that is, identity (no effect).
 
@@ -56,6 +54,12 @@ For convenience, registers may be addressed using an offset from a known registe
 Some source operands of instructions (called SRC1) support relative addressing. This means that it is possible to use one of the three built-in indexing registers (`a0`, `a1` and `a2` aka `lcnt`) to address a register, e.g. `someArray[lcnt]`. Adding an offset is also supported, e.g. `someArray[lcnt+2]`. This is useful in FOR loops.
 
 Normal floating-point vector registers may also be negated by prepending a minus sign before it, e.g. `-r2` or `-someArray[lcnt+2]`.
+
+## Linking Model
+
+`picasso` takes one or more source code files, and assembles them into a single `.shbin` file. A DVLE object is generated for each source code file, unless the `.nodvle` directive is used (see below). Procedures are shared amongst all source code files, and they may be defined and called wherever. Uniform space is also shared, that is, if two source code files declare the same uniform, they are assigned the same location. Constants however are not shared, and the same space is reused for the constants of each DVLE. Outputs and aliases are necessarily not shared either.
+
+The entry point of a DVLE may be set with the `.entry` directive. If this directive is not used, `main` is assumed as the entrypoint.
 
 ## Supported Directives
 
@@ -147,6 +151,8 @@ Allocates a new output register, wires it to a certain output property and creat
 - `7`: Under investigation.
 - `view`: Under investigation.
 
+The properties also accept an output mask, e.g. `texcoord0.xy`.
+
 Example:
 
 ```
@@ -154,6 +160,18 @@ Example:
 .out outClr color
 .out outTex texcoord0
 ```
+
+### .entry
+```
+.entry procedureName
+```
+Specifies the name of the procedure to use as the entrypoint of the current DVLE. If this directive is not used, `main` is assumed.
+
+### .nodvle
+```
+.nodvle
+```
+This directive tells `picasso` not to generate a DVLE for the source code file that is being processed. This allows for writing files that contain shared procedures to be used by other files.
 
 ## Supported Instructions
 
@@ -174,9 +192,6 @@ Syntax                            | Description
 `slt rDest, rSrc1, rSrc2`         |
 `max rDest, rSrc1, rSrc2`         |
 `min rDest, rSrc1, rSrc2`         |
-`dphi rDest, rSrc2, rSrc1`        |
-`sgei rDest, rSrc2, rSrc1`        |
-`slti rDest, rSrc2, rSrc1`        |
 `ex2 rDest, rSrc1`                |
 `lg2 rDest, rSrc1`                |
 `ex2 rDest, rSrc1`                |
@@ -195,14 +210,18 @@ Syntax                            | Description
 `callu bReg, procName`            |
 `ifu bReg`                        |
 `jmpu bReg, labelName`            |
-`madi rDest, rSrc1, rSrc2, rSrc1` |
-`mad rDest, rSrc1, rSrc1, rSrc2`  |
+`mad rDest, rSrc1, rSrc2, rSrc3`  |
 
 ### Description of operands
 
 - `rDest`: Represents a destination operand (register).
-- `rSrc1`: Represents a so-called SRC1 source operand (register), which allows accessing floating-point vector uniforms and relative addressing.
-- `rSrc2`: Represents a so-called SRC2 source operand (register), which is limited to input and scratch registers.
+- `rSrc1`/`rSrc2`/`rSrc3`: Represents a source operand (register). Depending on the position, some registers may be supported and some may not.
+	- Narrow source operands are limited to input and scratch registers.
+	- Wide source operands also support floating-point vector uniforms and relative addressing.
+	- In instructions that take one source operand, it is always wide.
+	- In instructions that take two source operands, the first is wide and the second is narrow.
+	- `dph`/`sge`/`slt` have a special form where the first operand is narrow and the second is wide. This usage is detected automatically by `picasso`.
+	- `mad`, which takes three source operands, has two forms: the first is wide-wide-narrow, and the second is wide-narrow-wide. This is also detected automatically.
 - `iReg`: Represents an integer vector uniform source operand.
 - `bReg`: Represents a boolean uniform source operand.
 - `procName`: Represents the name of a procedure.
