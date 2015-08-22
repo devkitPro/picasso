@@ -72,7 +72,7 @@ DVLEs are generated in the same order as the files in the command line.
 
 The entry point of a DVLE may be set with the `.entry` directive. If this directive is not used, `main` is assumed as the entrypoint.
 
-A DVLE is marked by default as a vertex shader, unless `setemit` is used (in the case of which a geometry shader is assumed).
+A DVLE is marked by default as a vertex shader, unless `setemit` or `.gsh` are used (in the case of which a geometry shader is assumed).
 
 Uniforms that start with the underscore (`_`) character are not exposed in the DVLE table of uniforms. This allows for creating private uniforms that can be internally used to configure the behaviour of shared procedures.
 
@@ -187,6 +187,12 @@ Specifies the name of the procedure to use as the entrypoint of the current DVLE
 .nodvle
 ```
 This directive tells `picasso` not to generate a DVLE for the source code file that is being processed. This allows for writing files that contain shared procedures to be used by other files.
+
+### .gsh
+```
+.gsh
+```
+This directive explicitly flags the current DVLE as a geometry shader.
 
 ### .setf
 ```

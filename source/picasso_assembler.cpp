@@ -1557,6 +1557,19 @@ DEF_DIRECTIVE(nodvle)
 	}
 }
 
+DEF_DIRECTIVE(gsh)
+{
+	DVLEData* dvle = GetDvleData();
+	ENSURE_NO_MORE_ARGS();
+
+	if (dvle->nodvle)
+		return throwError(".gsh has no effect if .nodvle is used\n");
+
+	dvle->isGeoShader = true;
+	return 0;
+}
+
+
 static const cmdTableType dirTable[] =
 {
 	DEC_DIRECTIVE(proc),
@@ -1571,6 +1584,7 @@ static const cmdTableType dirTable[] =
 	DEC_DIRECTIVE(out),
 	DEC_DIRECTIVE(entry),
 	DEC_DIRECTIVE(nodvle),
+	DEC_DIRECTIVE(gsh),
 	DEC_DIRECTIVE2(setf, setfi, UTYPE_FVEC),
 	DEC_DIRECTIVE2(seti, setfi, UTYPE_IVEC),
 	DEC_DIRECTIVE(setb),
