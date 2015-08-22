@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
 		if (dvle->nodvle) continue;
 		f.WriteWord(curOff);
 		curOff += 16*4; // Header
-		curOff += dvle->constantSize;
+		curOff += dvle->constantCount*20;
 		curOff += dvle->outputCount*8;
 		curOff += dvle->uniformCount*8;
 		curOff += dvle->symbolSize;
@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
 		f.WriteWord(0); // ???
 		f.WriteWord(curOff); // offset to constant table
 		f.WriteWord(dvle->constantCount); // size of constant table
-		curOff += dvle->constantSize;
+		curOff += dvle->constantCount*5*4;
 		f.WriteWord(curOff); // offset to label table (TODO)
 		f.WriteWord(0); // size of label table (TODO)
 		f.WriteWord(curOff); // offset to output table
@@ -199,7 +199,14 @@ int main(int argc, char* argv[])
 				f.WriteHword(ct.regId-0x80);
 				for (int j = 0; j < 4; j ++)
 					f.WriteByte(ct.iparam[j]);
+			} else if (ct.type == UTYPE_BOOL)
+			{
+				f.WriteHword(ct.regId-0x88);
+				f.WriteWord(ct.bparam ? 1 : 0);
 			}
+			if (ct.type != UTYPE_FVEC)
+				for (int j = 0; j < 3; j ++)
+					f.WriteWord(0); // Padding
 		}
 
 		// Write outputs

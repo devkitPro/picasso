@@ -55,11 +55,22 @@ Some source operands of instructions (called SRC1) support relative addressing. 
 
 Normal floating-point vector registers may also be negated by prepending a minus sign before it, e.g. `-r2` or `-someArray[lcnt+2]`.
 
+## Command Line Usage
+
+```
+Usage: picasso [options] files...
+Options:
+  -o, --out=<file>        Specifies the name of the SHBIN file to generate
+  -h, --header=<file>     Specifies the name of the header file to generate
+```
+
 ## Linking Model
 
 `picasso` takes one or more source code files, and assembles them into a single `.shbin` file. A DVLE object is generated for each source code file, unless the `.nodvle` directive is used (see below). Procedures are shared amongst all source code files, and they may be defined and called wherever. Uniform space is also shared, that is, if two source code files declare the same uniform, they are assigned the same location. Constants however are not shared, and the same space is reused for the constants of each DVLE. Outputs and aliases are necessarily not shared either.
 
 The entry point of a DVLE may be set with the `.entry` directive. If this directive is not used, `main` is assumed as the entrypoint.
+
+Uniforms that start with the underscore (`_`) character are not exposed in the DVLE table of uniforms. This allows for creating private uniforms that can be internally used to configure the behaviour of shared procedures.
 
 ## Supported Directives
 
@@ -173,6 +184,24 @@ Specifies the name of the procedure to use as the entrypoint of the current DVLE
 ```
 This directive tells `picasso` not to generate a DVLE for the source code file that is being processed. This allows for writing files that contain shared procedures to be used by other files.
 
+### .setf
+```
+.setf register(x, y, z, w)
+```
+Similar to `.constf`, this directive adds a DVLE constant entry for the specified floating-point vector uniform register to be loaded with the specified value. This is useful in order to instantiate a generalized shared procedure with the specified parameters.
+
+### .seti
+```
+.seti register(x, y, z, w)
+```
+Similar to `.consti`, this directive adds a DVLE constant entry for the specified integer vector uniform register to be loaded with the specified value. This is useful in order to instantiate a generalized shared procedure with the specified parameters.
+
+### .setb
+```
+.setb register value
+```
+This directive adds a DVLE constant entry for the specified boolean uniform register to be loaded with the specified value (which may be `true`, `false`, `on`, `off`, `1` or `0`). This is useful in order to control the flow of a generalized shared procedure.
+
 ## Supported Instructions
 
 See [Shader Instruction Set](http://3dbrew.org/wiki/Shader_Instruction_Set) for more details.
@@ -221,7 +250,7 @@ Syntax                            | Description
 	- In instructions that take one source operand, it is always wide.
 	- In instructions that take two source operands, the first is wide and the second is narrow.
 	- `dph`/`sge`/`slt` have a special form where the first operand is narrow and the second is wide. This usage is detected automatically by `picasso`.
-	- `mad`, which takes three source operands, has two forms: the first is wide-wide-narrow, and the second is wide-narrow-wide. This is also detected automatically.
+	- `mad`, which takes three source operands, has two forms: the first is wide-wide-narrow, and the second is wide-narrow-wide. This is also detected automatically. Additionally, relative addressing is not supported.
 - `iReg`: Represents an integer vector uniform source operand.
 - `bReg`: Represents a boolean uniform source operand.
 - `procName`: Represents the name of a procedure.

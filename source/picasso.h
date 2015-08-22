@@ -171,6 +171,7 @@ struct Constant
 	{
 		float fparam[4];
 		u8 iparam[4];
+		bool bparam;
 	};
 };
 
@@ -191,7 +192,6 @@ struct DVLEData
 	#define MAX_CONSTANT 0x60
 	Constant constantTable[MAX_CONSTANT];
 	int constantCount;
-	size_t constantSize;
 
 	// Outputs
 	#define MAX_OUTPUT 8
@@ -201,5 +201,5 @@ struct DVLEData
 	DVLEData(const char* filename) :
 		filename(filename), entrypoint("main"),
 		nodvle(false), isGeoShader(false),
-		uniformCount(0), symbolSize(0), constantCount(0), constantSize(0), outputCount(0) { }
+		uniformCount(0), symbolSize(0), constantCount(0), outputCount(0) { }
 };

@@ -1361,14 +1361,12 @@ DEF_DIRECTIVE(const)
 		ct.fparam[1] = atof(arg1Text);
 		ct.fparam[2] = atof(arg2Text);
 		ct.fparam[3] = atof(arg3Text);
-		dvle->constantSize += 4 + 4*4;
 	} else if (dirParam == UTYPE_IVEC)
 	{
 		ct.iparam[0] = atoi(arg0Text) & 0xFF;
 		ct.iparam[1] = atoi(arg1Text) & 0xFF;
 		ct.iparam[2] = atoi(arg2Text) & 0xFF;
 		ct.iparam[3] = atoi(arg3Text) & 0xFF;
-		dvle->constantSize += 4 + 4;
 	}
 
 	g_aliases.insert( std::pair<std::string,int>(constName, ct.regId | (DEFAULT_OPSRC<<8)) );
@@ -1381,6 +1379,93 @@ DEF_DIRECTIVE(const)
 #endif
 	return 0;
 };
+
+DEF_DIRECTIVE(setfi)
+{
+	DVLEData* dvle = GetDvleData();
+
+	NEXT_ARG_CPAREN(constName);
+	NEXT_ARG(arg0Text);
+	NEXT_ARG(arg1Text);
+	NEXT_ARG(arg2Text);
+	char* arg3Text = mystrtok_pos;
+	if (!mystrtok_pos) return missingParam();
+	char* parenPos = strchr(arg3Text, ')');
+	if (!parenPos) return throwError("invalid syntax\n");
+	*parenPos = 0;
+	arg3Text = trim_whitespace(arg3Text);
+
+	ARG_TO_REG(constReg, constName);
+	if (dirParam == UTYPE_FVEC)
+	{
+		if (constReg < 0x20 || constReg >= 0x80)
+			return throwError("invalid floating point vector uniform: %s\n", constName);
+	} else if (dirParam == UTYPE_IVEC)
+	{
+		if (constReg < 0x80 || constReg >= 0x84)
+			return throwError("invalid integer vector uniform: %s\n", constName);
+	}
+
+	if (dvle->constantCount == MAX_CONSTANT)
+		return throwError("too many local constants\n");
+
+	Constant& ct = dvle->constantTable[dvle->constantCount++];
+	ct.regId = constReg;
+	ct.type = dirParam;
+	if (dirParam == UTYPE_FVEC)
+	{
+		ct.fparam[0] = atof(arg0Text);
+		ct.fparam[1] = atof(arg1Text);
+		ct.fparam[2] = atof(arg2Text);
+		ct.fparam[3] = atof(arg3Text);
+	} else if (dirParam == UTYPE_IVEC)
+	{
+		ct.iparam[0] = atoi(arg0Text) & 0xFF;
+		ct.iparam[1] = atoi(arg1Text) & 0xFF;
+		ct.iparam[2] = atoi(arg2Text) & 0xFF;
+		ct.iparam[3] = atoi(arg3Text) & 0xFF;
+	}
+
+	return 0;
+}
+
+int parseBool(bool& out, const char* text)
+{
+	if (stricmp(text, "true")==0 || stricmp(text, "on")==0 || stricmp(text, "1")==0)
+	{
+		out = true;
+		return 0;
+	}
+	if (stricmp(text, "false")==0 || stricmp(text, "off")==0 || stricmp(text, "0")==0)
+	{
+		out = false;
+		return 0;
+	}
+	return throwError("invalid bool value: %s\n", text);
+}
+
+DEF_DIRECTIVE(setb)
+{
+	DVLEData* dvle = GetDvleData();
+
+	NEXT_ARG_SPC(constName);
+	NEXT_ARG_SPC(valueText);
+	ENSURE_NO_MORE_ARGS();
+	ARG_TO_BREG(constReg, constName);
+
+	bool constVal = false;
+	safe_call(parseBool(constVal, valueText));
+
+	if (dvle->constantCount == MAX_CONSTANT)
+		return throwError("too many local constants\n");
+
+	Constant& ct = dvle->constantTable[dvle->constantCount++];
+	ct.regId = constReg;
+	ct.type = UTYPE_BOOL;
+	ct.bparam = constVal;
+
+	return 0;
+}
 
 static int parseOutType(const char* text)
 {
@@ -1487,6 +1572,9 @@ static const cmdTableType dirTable[] =
 	DEC_DIRECTIVE(out),
 	DEC_DIRECTIVE(entry),
 	DEC_DIRECTIVE(nodvle),
+	DEC_DIRECTIVE2(setf, setfi, UTYPE_FVEC),
+	DEC_DIRECTIVE2(seti, setfi, UTYPE_IVEC),
+	DEC_DIRECTIVE(setb),
 	{ NULL, NULL },
 };
 
