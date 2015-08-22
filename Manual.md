@@ -64,11 +64,15 @@ Options:
   -h, --header=<file>     Specifies the name of the header file to generate
 ```
 
+DVLEs are generated in the same order as the files in the command line.
+
 ## Linking Model
 
 `picasso` takes one or more source code files, and assembles them into a single `.shbin` file. A DVLE object is generated for each source code file, unless the `.nodvle` directive is used (see below). Procedures are shared amongst all source code files, and they may be defined and called wherever. Uniform space is also shared, that is, if two source code files declare the same uniform, they are assigned the same location. Constants however are not shared, and the same space is reused for the constants of each DVLE. Outputs and aliases are necessarily not shared either.
 
 The entry point of a DVLE may be set with the `.entry` directive. If this directive is not used, `main` is assumed as the entrypoint.
+
+A DVLE is marked by default as a vertex shader, unless `setemit` is used (in the case of which a geometry shader is assumed).
 
 Uniforms that start with the underscore (`_`) character are not exposed in the DVLE table of uniforms. This allows for creating private uniforms that can be internally used to configure the behaviour of shared procedures.
 

@@ -7,7 +7,6 @@
 static const char* curFile = NULL;
 static int curLine = -1;
 
-bool g_isGeoShader = false;
 std::vector<u32> g_outputBuf;
 
 StackEntry g_stack[MAX_STACK];
