@@ -93,7 +93,7 @@ int main(int argc, char* argv[])
 		char* sourceCode = StringFromFile(vshFile);
 		if (!sourceCode)
 		{
-			fprintf(stderr, "error: cannot open input file: %s\n");
+			fprintf(stderr, "error: cannot open input file: %s\n", vshFile);
 			return EXIT_FAILURE;
 		}
 
