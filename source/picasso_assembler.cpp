@@ -37,6 +37,7 @@ public:
 		int pos = end - size;
 		if (pos < start) return -1;
 		bound = pos < bound ? pos : bound;
+		end = pos;
 		return pos;
 	}
 };
