@@ -1,5 +1,10 @@
 # picasso Changelog
 
+# v2.1
+
+- Fixed input file open error message.
+- Fixed `.constf` misallocation bug.
+
 # v2.0
 
 - (**Breaking change**) Command line format changed.
