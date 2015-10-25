@@ -16,7 +16,6 @@ typedef uint8_t u8;
 
 #define BIT(n) (1U << (n))
 
-#if !defined(__GNUC__) || (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 6)
 #ifndef __BYTE_ORDER__
 #include <sys/param.h>
 #define __BYTE_ORDER__ BYTE_ORDER
@@ -25,11 +24,14 @@ typedef uint8_t u8;
 #endif
 
 #ifndef __llvm__
+#if !defined(__GNUC__) || (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 8)
+
 static inline uint16_t __builtin_bswap16(uint16_t x)
 {
 	return ((x << 8) & 0xff00) | ((x >> 8) & 0x00ff);
 }
 
+#if defined(__GNUC__) && (__GNUC__ == 4 && __GNUC_MINOR__ < 7)
 static inline uint32_t __builtin_bswap32(uint32_t x)
 {
 	return ((x << 24) & 0xff000000) |
@@ -43,6 +45,7 @@ static inline uint64_t __builtin_bswap64(uint64_t x)
 	return (uint64_t)__builtin_bswap32(x>>32) |
 	      ((uint64_t)__builtin_bswap32(x&0xFFFFFFFF) << 32);
 }
+#endif
 #endif
 #endif
 
