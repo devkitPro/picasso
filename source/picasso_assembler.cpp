@@ -855,13 +855,20 @@ DEF_COMMAND(format5)
 
 DEF_COMMAND(formatmova)
 {
+	NEXT_ARG(targetReg);
 	NEXT_ARG(src1Name);
 	ENSURE_NO_MORE_ARGS();
+
+	int mask;
+	if      (strcmp(targetReg, "a0")==0)  mask = BIT(3);
+	else if (strcmp(targetReg, "a1")==0)  mask = BIT(2);
+	else if (strcmp(targetReg, "a01")==0) mask = BIT(3) | BIT(2);
+	else return throwError("invalid destination register for mova: %s\n", targetReg);
 
 	ARG_TO_SRC1_REG2(rSrc1, src1Name);
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(0, rSrc1Sw, 0, 0), OPDESC_MASK_1));
+	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(mask, rSrc1Sw, 0, 0), OPDESC_MASK_MOVA));
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X (0x%X)\n", cmdName, opcode, rSrc1, opdesc);
