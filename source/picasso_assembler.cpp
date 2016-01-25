@@ -1021,6 +1021,17 @@ DEF_COMMAND(format3)
 {
 	NEXT_ARG(regName);
 
+	u32 negation = 0;
+	if (*regName == '!')
+	{
+		if (opcode == MAESTRO_JMPU)
+		{
+			negation = 1;
+			regName ++;
+		} else
+			return throwError("Inverting the condition is not supported by %s\n", opcode==MAESTRO_CALLU ? "CALLU" : "IFU");
+	}
+
 	ARG_TO_BREG(regId, regName);
 
 	switch (opcode)
@@ -1061,7 +1072,7 @@ DEF_COMMAND(format3)
 		}
 	}
 
-	BUF.push_back(FMT_OPCODE(opcode) | ((regId-0x88) << 22));
+	BUF.push_back(FMT_OPCODE(opcode) | ((regId-0x88) << 22) | negation);
 
 	return 0;
 }

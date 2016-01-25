@@ -248,7 +248,7 @@ Syntax                            | Description
 `jmpc condExp, labelName`         |
 `callu bReg, procName`            |
 `ifu bReg`                        |
-`jmpu bReg, labelName`            |
+`jmpu [!]bReg, labelName`         |
 `mad rDest, rSrc1, rSrc2, rSrc3`  |
 
 ### Description of operands
