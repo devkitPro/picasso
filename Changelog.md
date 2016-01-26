@@ -1,5 +1,11 @@
 # picasso Changelog
 
+# v2.2
+
+- Added proper support for the MOVA instruction.
+- Added support for inverting the condition in JMPU.
+- Fixed `lcnt` bug.
+
 # v2.1
 
 - Fixed input file open error message.
