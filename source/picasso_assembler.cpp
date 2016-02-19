@@ -19,6 +19,10 @@ int g_opdescMasks[MAX_OPDESC];
 Uniform g_uniformTable[MAX_UNIFORM];
 int g_uniformCount;
 
+std::vector<Constant> g_constArray;
+int g_constArraySize = -1;
+const char* g_constArrayName;
+
 class UniformAlloc
 {
 	int start, end, bound, tend;
@@ -43,6 +47,17 @@ public:
 };
 
 static UniformAlloc fvecAlloc(0x20, 0x80), ivecAlloc(0x80, 0x84), boolAlloc(0x88, 0x98);
+
+static inline UniformAlloc& getAlloc(int type)
+{
+	switch (type)
+	{
+		default:
+		case UTYPE_FVEC: return fvecAlloc;
+		case UTYPE_IVEC: return ivecAlloc;
+		case UTYPE_BOOL: return boolAlloc;
+	}
+}
 
 procTableType g_procTable;
 dvleTableType g_dvleTable;
@@ -1226,6 +1241,52 @@ DEF_DIRECTIVE(end)
 			}
 			break;
 		}
+
+		case SE_ARRAY:
+		{
+#ifdef DEBUG
+			printf("ENDARRAY\n");
+#endif
+			DVLEData* dvle = GetDvleData();
+			UniformAlloc& alloc = getAlloc(UTYPE_FVEC);
+
+			if (g_aliases.find(g_constArrayName) != g_aliases.end())
+				return duplicateIdentifier(g_constArrayName);
+
+			int size = g_constArray.size();
+			if (g_constArraySize >= 0) for (; size < g_constArraySize; size ++)
+			{
+				Constant c;
+				memset(&c, 0, sizeof(c));
+				c.type = UTYPE_FVEC;
+				g_constArray.push_back(c);
+			}
+
+			if (size == 0)
+				return throwError("no elements have been specified in array '%s'\n", g_constArrayName);
+
+			int uniformPos = alloc.AllocLocal(size);
+			if (uniformPos < 0)
+				return throwError("not enough space for local constant array '%s'\n", g_constArrayName);
+
+			if ((dvle->constantCount+size) > MAX_CONSTANT)
+				return throwError("too many local constants\n");
+
+			for (int i = 0; i < size; i ++)
+			{
+				Constant& src = g_constArray[i];
+				Constant& dst = dvle->constantTable[dvle->constantCount++];
+				src.regId = uniformPos+i;
+				memcpy(&dst, &src, sizeof(src));
+			}
+
+			g_aliases.insert( std::pair<std::string,int>(g_constArrayName, uniformPos | (DEFAULT_OPSRC<<8)) );
+
+			g_constArray.clear();
+			g_constArraySize = -1;
+			g_constArrayName = NULL;
+			break;
+		}
 	}
 
 	return 0;
@@ -1248,17 +1309,6 @@ DEF_DIRECTIVE(alias)
 
 	g_aliases.insert( std::pair<std::string,int>(aliasName, rAlias | (rAliasSw<<8)) );
 	return 0;
-}
-
-static inline UniformAlloc& getAlloc(int type)
-{
-	switch (type)
-	{
-		default:
-		case UTYPE_FVEC: return fvecAlloc;
-		case UTYPE_IVEC: return ivecAlloc;
-		case UTYPE_BOOL: return boolAlloc;
-	}
 }
 
 DEF_DIRECTIVE(uniform)
@@ -1397,6 +1447,80 @@ DEF_DIRECTIVE(const)
 #endif
 	return 0;
 };
+
+DEF_DIRECTIVE(constfa)
+{
+	bool inArray = g_stackPos && g_stack[g_stackPos-1].type == SE_ARRAY;
+
+	if (!inArray)
+	{
+		NEXT_ARG(constName);
+		ENSURE_NO_MORE_ARGS();
+
+		if (NO_MORE_STACK)
+			return throwError("too many nested blocks\n");
+
+		char* sizePos = strchr(constName, '[');
+		if (!sizePos)
+			return throwError("missing opening bracket: %s\n", constName);
+
+		char* closePos = strchr(sizePos, ']');
+		if (!closePos)
+			return throwError("missing closing bracket: %s\n", constName);
+
+		*closePos++ = 0;
+		*sizePos++ = 0;
+		closePos = trim_whitespace(closePos);
+		sizePos = trim_whitespace(sizePos);
+
+		if (*closePos)
+			return throwError("garbage found: %s\n", closePos);
+
+		if (*sizePos)
+		{
+			g_constArraySize = atoi(sizePos);
+			if (g_constArraySize <= 0)
+				return throwError("invalid array size: %s[%s]\n", constName, sizePos);
+		}
+
+		if (!validateIdentifier(constName))
+			return throwError("invalid array name: %s\n", constName);
+
+		g_constArrayName = constName;
+
+		StackEntry& elem = g_stack[g_stackPos++];
+		elem.type = SE_ARRAY;
+
+	} else
+	{
+		if (g_constArraySize >= 0 && g_constArraySize == g_constArray.size())
+			return throwError("too many elements in the array, expected %d\n", g_constArraySize);
+
+		NEXT_ARG(arg0Text);
+		if (*arg0Text != '(')
+			return throwError("invalid syntax\n");
+		arg0Text++;
+
+		NEXT_ARG(arg1Text);
+		NEXT_ARG(arg2Text);
+		char* arg3Text = mystrtok_pos;
+		if (!mystrtok_pos) return missingParam();
+		char* parenPos = strchr(arg3Text, ')');
+		if (!parenPos) return throwError("invalid syntax\n");
+		*parenPos = 0;
+		arg3Text = trim_whitespace(arg3Text);
+
+		Constant ct;
+		ct.type = UTYPE_FVEC;
+		ct.fparam[0] = atof(arg0Text);
+		ct.fparam[1] = atof(arg1Text);
+		ct.fparam[2] = atof(arg2Text);
+		ct.fparam[3] = atof(arg3Text);
+		g_constArray.push_back(ct);
+	}
+
+	return 0;
+}
 
 DEF_DIRECTIVE(setfi)
 {
@@ -1574,6 +1698,8 @@ DEF_DIRECTIVE(nodvle)
 		dvle->nodvle = true;
 		g_totalDvleCount --;
 	}
+
+	return 0;
 }
 
 DEF_DIRECTIVE(gsh)
@@ -1600,6 +1726,7 @@ static const cmdTableType dirTable[] =
 	DEC_DIRECTIVE2(bool, uniform, UTYPE_BOOL),
 	DEC_DIRECTIVE2(constf, const, UTYPE_FVEC),
 	DEC_DIRECTIVE2(consti, const, UTYPE_IVEC),
+	DEC_DIRECTIVE(constfa),
 	DEC_DIRECTIVE(out),
 	DEC_DIRECTIVE(entry),
 	DEC_DIRECTIVE(nodvle),

@@ -150,6 +150,32 @@ Reserves a new integer vector uniform to be preloaded with the specified constan
 .constf loopParams(16, 0, 1, 0)
 ```
 
+### .constfa
+```
+.constfa arrayName[]
+.constfa arrayName[size]
+.constfa (x, y, z, w)
+```
+Reserves a new array of floating-point vector uniforms to be preloaded with the specified constants; creates an alias for it that points to the first element. Example:
+
+```
+; Create an array of two elements
+.constfa myArray[]
+.constfa (1.0, 2.0, 3.0, 4.0)
+.constfa (5.0, 6.0, 7.0, 8.0)
+.end
+```
+
+Optionally the size of the array may be specified. If a number of elements less than the size is specified, the missing elements are initialized to zero. Example:
+
+```
+.constfa myArray[4]
+.constfa (1.0, 2.0, 3.0, 4.0)
+.constfa (5.0, 6.0, 7.0, 8.0)
+; The remaining two elements are vectors full of zeroes.
+.end
+```
+
 ### .out
 ```
 .out outName propName

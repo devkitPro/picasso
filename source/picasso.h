@@ -74,6 +74,7 @@ enum
 	SE_PROC,
 	SE_FOR,
 	SE_IF,
+	SE_ARRAY,
 };
 
 struct StackEntry
