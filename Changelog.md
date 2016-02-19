@@ -1,5 +1,10 @@
 # picasso Changelog
 
+# v2.3
+
+- Added `.constfa` for creating floating-point vector constant arrays.
+- Fixed `.nodvle` bug.
+
 # v2.2
 
 - Added proper support for the MOVA instruction.
