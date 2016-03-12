@@ -48,6 +48,12 @@
 	; Set vertex color
 	mov outclr.xyz, inarg
 	mov outclr.w, ones
+
+	; Random raw encoded nop
+	.opdesc nop_opdesc 0x00000000 0x00FFFF00 ; Adds an opdesc with value 0 and mask 0x00FFFF00 (last argument is optional)
+	.opdesc nop_opdesc2 0x12345678 ; Adds an opdesc with value 0 and mask 0xFFFFFFFF
+	.inst 0x84000000 nop_opdesc; nop but lower bits will become index of opdesc
+	.inst 0x84000000 ; nop with opdesc 0
 	
 	end
 .end

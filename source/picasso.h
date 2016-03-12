@@ -126,12 +126,14 @@ typedef std::pair<size_t, std::string> relocation; // position, name
 typedef std::map<std::string, procedure> procTableType;
 typedef std::map<std::string, size_t> labelTableType;
 typedef std::map<std::string, int> aliasTableType;
+typedef std::map<std::string, int> opdescTableType;
 typedef std::vector<relocation> relocTableType;
 typedef std::list<DVLEData> dvleTableType;
 
 typedef procTableType::iterator procTableIter;
 typedef labelTableType::iterator labelTableIter;
 typedef aliasTableType::iterator aliasTableIter;
+typedef opdescTableType::iterator opdescTableIter;
 typedef relocTableType::iterator relocTableIter;
 typedef dvleTableType::iterator dvleTableIter;
 
@@ -144,6 +146,7 @@ extern int g_totalDvleCount;
 extern labelTableType g_labels;
 extern relocTableType g_labelRelocTable;
 extern aliasTableType g_aliases;
+extern opdescTableType g_opdescs;
 
 int AssembleString(char* str, const char* initialFilename);
 int RelocateProduct(void);

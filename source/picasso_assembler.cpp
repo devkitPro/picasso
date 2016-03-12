@@ -67,6 +67,7 @@ int g_totalDvleCount;
 labelTableType g_labels;
 relocTableType g_labelRelocTable;
 aliasTableType g_aliases;
+opdescTableType g_opdescs;
 
 static DVLEData* curDvle;
 
@@ -78,6 +79,7 @@ static void ClearStatus(void)
 	g_labels.clear();
 	g_labelRelocTable.clear();
 	g_aliases.clear();
+	g_opdescs.clear();
 	curDvle = NULL;
 }
 
@@ -164,7 +166,7 @@ static int throwError(const char* msg, ...)
 	return 1;
 }
 
-static int parseInt(char* pos, int& out, long long min, long long max)
+static int parseInt(char* pos, long long& out, long long min, long long max)
 {
 	char* endptr = NULL;
 	long long res = strtoll(pos, &endptr, 0);
@@ -359,6 +361,12 @@ typedef struct
 		if (!_varName) _varName = (char*)(_opt); \
 	} while (0)
 
+#define NEXT_ARG_SPC_OPT(_varName, _opt) char* _varName; do \
+	{ \
+		_varName = nextArgSpc(); \
+		if (!_varName) _varName = (char*)(_opt); \
+	} while (0)
+
 #define DEF_COMMAND(name) \
 	static int cmd_##name(const char* cmdName, int opcode, int opcodei)
 
@@ -447,7 +455,7 @@ static inline int ensure_valid_condop(int condop, const char* name)
 #define ENSURE_NO_MORE_ARGS() safe_call(ensureNoMoreArgs())
 
 #define ARG_TO_INT(_varName, _argName, _min, _max) \
-	int _varName = 0; \
+	long long _varName = 0; \
 	safe_call(parseInt(_argName, _varName, _min, _max))
 
 #define ARG_TO_REG(_varName, _argName) \
@@ -652,7 +660,9 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 	if (!isregp(pos[0]) || !isdigit(pos[1]))
 		return throwError("invalid register: %s\n", pos);
 
-	safe_call(parseInt(pos+1, outReg, 0, 255));
+	long long temp;
+	safe_call(parseInt(pos+1, temp, 0, 255));
+	outReg = temp;
 	switch (*pos)
 	{
 		case 'o': // Output registers
@@ -1714,6 +1724,60 @@ DEF_DIRECTIVE(gsh)
 	return 0;
 }
 
+DEF_DIRECTIVE(opdesc)
+{
+	NEXT_ARG_SPC(opdescName);
+	NEXT_ARG_SPC(data);
+	NEXT_ARG_SPC_OPT(mask, "0xFFFFFFFF");
+	ENSURE_NO_MORE_ARGS();
+
+	if (!validateIdentifier(opdescName))
+		return throwError("invalid opdesc name: %s\n", opdescName);
+
+	if (g_opdescs.find(opdescName) != g_opdescs.end())
+		return duplicateIdentifier(opdescName);
+
+	ARG_TO_INT(dataValue, data, 0x00000000, 0xFFFFFFFF);
+	ARG_TO_INT(maskValue, mask, 0x00000000, 0xFFFFFFFF);
+
+	if (dataValue & ~maskValue)
+		return throwError("value doesn't fit into mask: 0x%08X\n", dataValue);
+
+#ifdef DEBUG
+	printf("opdesc:0x%08X 0x%08X\n", dataValue, maskValue);
+#endif
+
+	int opdesc = 0;
+	safe_call(findOrAddOpdesc(opdesc, dataValue, maskValue));
+
+	g_opdescs.insert( std::pair<std::string,int>(opdescName, opdesc) );
+	return 0;
+}
+
+DEF_DIRECTIVE(inst)
+{
+	NEXT_ARG_SPC(data);
+	NEXT_ARG_SPC_OPT(opdescName, NULL);
+	ENSURE_NO_MORE_ARGS();
+
+	ARG_TO_INT(dataValue, data, 0x00000000, 0xFFFFFFFF);
+
+	int opdesc = 0;
+	if (opdescName) {
+		opdescTableIter opdescIt = g_opdescs.find(opdescName);
+		if (opdescIt == g_opdescs.end())
+			return throwError("opdesc '%s' is undefined\n", opdescName);
+		opdesc = opdescIt->second;
+	}
+
+#ifdef DEBUG
+	printf("inst:0x%08X opdesc %d\n", dataValue, opdesc);
+#endif
+
+	BUF.push_back(dataValue | opdesc);
+
+	return 0;
+}
 
 static const cmdTableType dirTable[] =
 {
@@ -1734,6 +1798,8 @@ static const cmdTableType dirTable[] =
 	DEC_DIRECTIVE2(setf, setfi, UTYPE_FVEC),
 	DEC_DIRECTIVE2(seti, setfi, UTYPE_IVEC),
 	DEC_DIRECTIVE(setb),
+	DEC_DIRECTIVE(opdesc),
+	DEC_DIRECTIVE(inst),
 	{ NULL, NULL },
 };
 
