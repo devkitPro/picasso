@@ -62,6 +62,7 @@ Usage: picasso [options] files...
 Options:
   -o, --out=<file>        Specifies the name of the SHBIN file to generate
   -h, --header=<file>     Specifies the name of the header file to generate
+  -v, --version           Displays version information
 ```
 
 DVLEs are generated in the same order as the files in the command line.
