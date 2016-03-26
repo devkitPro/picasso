@@ -1,5 +1,10 @@
 # picasso Changelog
 
+# v2.4
+
+- Corrected MAD instruction encoding.
+- Added command line flag for retrieving the picasso version.
+
 # v2.3
 
 - Added `.constfa` for creating floating-point vector constant arrays.

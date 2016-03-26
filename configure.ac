@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([picasso],[2.3.0],[fincs.alt1@gmail.com])
+AC_INIT([picasso],[2.4.0],[fincs.alt1@gmail.com])
 AC_CONFIG_SRCDIR([source/picasso_frontend.cpp])
 
 AM_INIT_AUTOMAKE([1.10])
