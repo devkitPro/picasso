@@ -286,7 +286,7 @@ Syntax                            | Description
 	- In instructions that take one source operand, it is always wide.
 	- In instructions that take two source operands, the first is wide and the second is narrow.
 	- `dph`/`sge`/`slt` have a special form where the first operand is narrow and the second is wide. This usage is detected automatically by `picasso`.
-	- `mad`, which takes three source operands, has two forms: the first is wide-wide-narrow, and the second is wide-narrow-wide. This is also detected automatically. Additionally, relative addressing is not supported.
+	- `mad`, which takes three source operands, has two forms: the first is narrow-wide-narrow, and the second is narrow-narrow-wide. This is also detected automatically. Additionally, relative addressing applies to the first source operand (which is narrow) instead of the single wide operand.
 - `idxReg`: Represents an indexing register to write to using the mova instruction. Can be `a0`, `a1` or `a01` (the latter writes to both `a0` and `a1`).
 - `iReg`: Represents an integer vector uniform source operand.
 - `bReg`: Represents a boolean uniform source operand.

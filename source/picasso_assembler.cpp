@@ -481,6 +481,10 @@ static inline int ensure_valid_condop(int condop, const char* name)
 	ARG_TO_REG(_reg, _name); \
 	safe_call(ensure_valid_src_narrow(_reg, _name, 2))
 
+#define ARG_TO_SRC2_REG2(_reg, _name) \
+	ARG_TO_REG2(_reg, _name); \
+	safe_call(ensure_valid_src_narrow(_reg, _name, 1))
+
 #define ARG_TO_IREG(_reg, _name) \
 	ARG_TO_REG(_reg, _name); \
 	safe_call(ensure_valid_ireg(_reg, _name))
@@ -835,7 +839,7 @@ DEF_COMMAND(format5)
 	ENSURE_NO_MORE_ARGS();
 
 	ARG_TO_DEST_REG(rDest, destName);
-	ARG_TO_SRC1_REG(rSrc1, src1Name);
+	ARG_TO_SRC2_REG2(rSrc1, src1Name);
 	ARG_TO_REG(rSrc2, src2Name);
 	ARG_TO_REG(rSrc3, src3Name);
 
@@ -861,9 +865,9 @@ DEF_COMMAND(format5)
 	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
 #endif
 	if (!inverted)
-		BUF.push_back(FMT_OPCODE(opcode)  | opdesc | (rSrc3<<5) | (rSrc2<<10) | (rSrc1<<17) | (rDest<<24));
+		BUF.push_back(FMT_OPCODE(opcode)  | opdesc | (rSrc3<<5) | (rSrc2<<10) | (rSrc1<<17) | (rSrc1Idx<<22) | (rDest<<24));
 	else
-		BUF.push_back(FMT_OPCODE(opcodei) | opdesc | (rSrc3<<5) | (rSrc2<<12) | (rSrc1<<17) | (rDest<<24));
+		BUF.push_back(FMT_OPCODE(opcodei) | opdesc | (rSrc3<<5) | (rSrc2<<12) | (rSrc1<<17) | (rSrc1Idx<<22) | (rDest<<24));
 
 	return 0;
 }
