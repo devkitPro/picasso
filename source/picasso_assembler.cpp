@@ -481,10 +481,6 @@ static inline int ensure_valid_condop(int condop, const char* name)
 	ARG_TO_REG(_reg, _name); \
 	safe_call(ensure_valid_src_narrow(_reg, _name, 2))
 
-#define ARG_TO_SRC2_REG2(_reg, _name) \
-	ARG_TO_REG2(_reg, _name); \
-	safe_call(ensure_valid_src_narrow(_reg, _name, 1))
-
 #define ARG_TO_IREG(_reg, _name) \
 	ARG_TO_REG(_reg, _name); \
 	safe_call(ensure_valid_ireg(_reg, _name))
@@ -573,8 +569,6 @@ static inline int parseCondOp(const char* name)
 	if (stricmp(name, "le")==0) return COND_LE;
 	if (stricmp(name, "gt")==0) return COND_GT;
 	if (stricmp(name, "ge")==0) return COND_GE;
-	if (*name == '6') return COND_UNK1;
-	if (*name == '7') return COND_UNK2;
 	return -1;
 }
 
@@ -660,32 +654,32 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 	switch (*pos)
 	{
 		case 'o': // Output registers
-			if (outReg < 0x00 || outReg >= 0x08)
-				return throwError("invalid output register: %s(%d)\n", pos);
+			if (outReg < 0x00 || outReg >= 0x07)
+				return throwError("invalid output register: %s\n", pos);
 			break;
 		case 'v': // Input attributes
 			if (outReg < 0x00 || outReg >= 0x0F)
-				return throwError("invalid input register: %s(%d)\n", pos);
+				return throwError("invalid input register: %s\n", pos);
 			break;
 		case 'r': // Temporary registers
 			outReg += 0x10;
 			if (outReg < 0x10 || outReg >= 0x20)
-				return throwError("invalid temporary register: %s(%d)\n", pos);
+				return throwError("invalid temporary register: %s\n", pos);
 			break;
 		case 'c': // Floating-point vector uniform registers
 			outReg += 0x20;
 			if (outReg < 0x20 || outReg >= 0x80)
-				return throwError("invalid floating-point vector uniform register: %s(%d)\n", pos);
+				return throwError("invalid floating-point vector uniform register: %s\n", pos);
 			break;
 		case 'i': // Integer vector uniforms
 			outReg += 0x80;
 			if (outReg < 0x80 || outReg >= 0x88)
-				return throwError("invalid integer vector uniform register: %s(%d)\n", pos);
+				return throwError("invalid integer vector uniform register: %s\n", pos);
 			break;
 		case 'b': // Boolean uniforms
 			outReg += 0x88;
 			if (outReg < 0x88 || outReg >= 0x98)
-				return throwError("invalid boolean uniform register: %s(%d)\n", pos);
+				return throwError("invalid boolean uniform register: %s\n", pos);
 			break;
 	}
 	outReg += regOffset;
@@ -839,20 +833,22 @@ DEF_COMMAND(format5)
 	ENSURE_NO_MORE_ARGS();
 
 	ARG_TO_DEST_REG(rDest, destName);
-	ARG_TO_SRC2_REG2(rSrc1, src1Name);
-	ARG_TO_REG(rSrc2, src2Name);
-	ARG_TO_REG(rSrc3, src3Name);
+	ARG_TO_SRC2_REG(rSrc1, src1Name);
+	ARG_TO_REG2(rSrc2, src2Name);
+	ARG_TO_REG2(rSrc3, src3Name);
 
-	bool inverted = opcodei >= 0 && rSrc2 < 0x20 && rSrc3 >= 0x20;
+	bool inverted = opcodei >= 0 && rSrc2 < 0x20 && (rSrc3 >= 0x20 || (rSrc3Idx && !rSrc2Idx));
 
 	if (!inverted)
 	{
 		safe_call(ensure_valid_src_wide(rSrc2, src2Name, 2));
 		safe_call(ensure_valid_src_narrow(rSrc3, src3Name, 3));
+		safe_call(ensure_no_idxreg(rSrc3Idx, 2));
 	} else
 	{
 		safe_call(ensure_valid_src_narrow(rSrc2, src2Name, 2));
 		safe_call(ensure_valid_src_wide(rSrc3, src3Name, 3));
+		safe_call(ensure_no_idxreg(rSrc2Idx, 2));
 	}
 
 	int opdesc = 0;
@@ -865,9 +861,9 @@ DEF_COMMAND(format5)
 	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
 #endif
 	if (!inverted)
-		BUF.push_back(FMT_OPCODE(opcode)  | opdesc | (rSrc3<<5) | (rSrc2<<10) | (rSrc1<<17) | (rSrc1Idx<<22) | (rDest<<24));
+		BUF.push_back(FMT_OPCODE(opcode)  | opdesc | (rSrc3<<5) | (rSrc2<<10) | (rSrc1<<17) | (rSrc2Idx<<22) | (rDest<<24));
 	else
-		BUF.push_back(FMT_OPCODE(opcodei) | opdesc | (rSrc3<<5) | (rSrc2<<12) | (rSrc1<<17) | (rSrc1Idx<<22) | (rDest<<24));
+		BUF.push_back(FMT_OPCODE(opcodei) | opdesc | (rSrc3<<5) | (rSrc2<<12) | (rSrc1<<17) | (rSrc3Idx<<22) | (rDest<<24));
 
 	return 0;
 }
@@ -924,7 +920,7 @@ DEF_COMMAND(formatsetemit)
 	NEXT_ARG_OPT(flagStr, NULL);
 	ENSURE_NO_MORE_ARGS();
 
-	ARG_TO_INT(vtxId, vtxIdStr, 0, 3);
+	ARG_TO_INT(vtxId, vtxIdStr, 0, 2);
 	bool isPrim, isInv;
 	safe_call(parseSetEmitFlags(flagStr, isPrim, isInv));
 
