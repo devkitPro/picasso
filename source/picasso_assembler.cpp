@@ -525,15 +525,67 @@ static int maskFromSwizzling(int sw, bool reverse = true)
 	return out;
 }
 
-static int findOrAddOpdesc(int& out, int opdesc, int mask)
+static void optimizeOpdesc(int& mask, int opcode, int opdesc)
 {
+	int unused1 = 0, unused2 = 0, unused3 = 0;
+	bool optimize = false;
+
+	switch (opcode)
+	{
+		case MAESTRO_ADD:
+		case MAESTRO_MUL:
+		case MAESTRO_SGE:
+		case MAESTRO_SLT:
+		case MAESTRO_FLR:
+		case MAESTRO_MAX:
+		case MAESTRO_MIN:
+		case MAESTRO_MOV:
+		case MAESTRO_MAD:
+			for (int i = 0; i < 4; i ++)
+				if (!(opdesc & BIT(3-i)))
+					unused1 |= SWIZZLE_COMP(i,3);
+			unused2 = unused1;
+			unused3 = unused1;
+			break;
+
+		case MAESTRO_DP3:
+			unused1 = SWIZZLE_COMP(3,3);
+			unused2 = SWIZZLE_COMP(3,3);
+			break;
+
+		case MAESTRO_DPH:
+			unused1 = SWIZZLE_COMP(3,3);
+			break;
+
+		case MAESTRO_EX2:
+		case MAESTRO_LG2:
+		case MAESTRO_RCP:
+		case MAESTRO_RSQ:
+			unused1 = SWIZZLE_COMP(1,3) | SWIZZLE_COMP(2,3) | SWIZZLE_COMP(3,3);
+			break;
+
+		case MAESTRO_MOVA:
+			if (!(opdesc & BIT(3-COMP_X))) unused1 |= SWIZZLE_COMP(0,3);
+			if (!(opdesc & BIT(3-COMP_Y))) unused1 |= SWIZZLE_COMP(1,3);
+		case MAESTRO_CMP:
+			unused1 |= SWIZZLE_COMP(2,3) | SWIZZLE_COMP(3,3);
+			break;
+	}
+
+	mask &= ~OPDESC_MAKE(0,OPSRC_MAKE(0,unused1),OPSRC_MAKE(0,unused2),OPSRC_MAKE(0,unused3));
+}
+
+static int findOrAddOpdesc(int opcode, int& out, int opdesc, int mask)
+{
+	optimizeOpdesc(mask, opcode, opdesc);
+
 	for (int i = 0; i < g_opdescCount; i ++)
 	{
 		int minMask = mask & g_opdescMasks[i];
 		if ((opdesc&minMask) == (g_opdescTable[i]&minMask))
 		{
-			// Save extra bits, if any
-			g_opdescTable[i] |= opdesc & (mask^minMask);
+			// Update opdesc to include extra bits (if any)
+			g_opdescTable[i] = (g_opdescTable[i]&~mask) | (opdesc & mask);
 			g_opdescMasks[i] |= mask;
 			out = i;
 			return 0;
@@ -767,7 +819,7 @@ DEF_COMMAND(format1)
 	}
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_D12));
+	safe_call(findOrAddOpdesc(opcode, opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_D12));
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, opdesc);
@@ -790,7 +842,7 @@ DEF_COMMAND(format1u)
 	ARG_TO_SRC1_REG2(rSrc1, src1Name);
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, 0, 0), OPDESC_MASK_D1));
+	safe_call(findOrAddOpdesc(opcode, opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, 0, 0), OPDESC_MASK_D1));
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, opdesc);
@@ -814,7 +866,7 @@ DEF_COMMAND(format1c)
 	ARG_TO_SRC2_REG(rSrc2, src2Name);
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(0, rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_12));
+	safe_call(findOrAddOpdesc(opcode, opdesc, OPDESC_MAKE(0, rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_12));
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X, %d, %d, d%02X (0x%X)\n", cmdName, opcode, rSrc1, cmpx, cmpy, rSrc2, opdesc);
@@ -852,7 +904,7 @@ DEF_COMMAND(format5)
 	}
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
+	safe_call(findOrAddOpdesc(opcode, opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
 
 	if (opdesc >= 32)
 		return throwError("opdesc allocation error\n");
@@ -883,7 +935,7 @@ DEF_COMMAND(formatmova)
 	ARG_TO_SRC1_REG2(rSrc1, src1Name);
 
 	int opdesc = 0;
-	safe_call(findOrAddOpdesc(opdesc, OPDESC_MAKE(mask, rSrc1Sw, 0, 0), OPDESC_MASK_MOVA));
+	safe_call(findOrAddOpdesc(opcode, opdesc, OPDESC_MAKE(mask, rSrc1Sw, 0, 0), OPDESC_MASK_D1));
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X (0x%X)\n", cmdName, opcode, rSrc1, opdesc);
