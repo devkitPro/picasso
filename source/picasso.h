@@ -62,6 +62,7 @@ enum
 //-----------------------------------------------------------------------------
 
 // Output buffer
+#define MAX_VSH_SIZE 512
 typedef std::vector<u32> outputBufType;
 typedef outputBufType::iterator outputBufIter;
 extern outputBufType g_outputBuf;
@@ -141,6 +142,8 @@ extern int g_totalDvleCount;
 extern labelTableType g_labels;
 extern relocTableType g_labelRelocTable;
 extern aliasTableType g_aliases;
+
+extern bool g_autoNop;
 
 int AssembleString(char* str, const char* initialFilename);
 int RelocateProduct(void);

@@ -6,6 +6,7 @@
 
 static const char* curFile = NULL;
 static int curLine = -1;
+static bool lastWasEnd = false;
 
 std::vector<u32> g_outputBuf;
 
@@ -22,6 +23,8 @@ int g_uniformCount;
 std::vector<Constant> g_constArray;
 int g_constArraySize = -1;
 const char* g_constArrayName;
+
+bool g_autoNop = true;
 
 class UniformAlloc
 {
@@ -795,6 +798,14 @@ static inline bool isBadInputRegCombination(int a, int b, int c)
 	return isBadInputRegCombination(a,b) || isBadInputRegCombination(b,c) || isBadInputRegCombination(c,a);
 }
 
+static void insertPaddingNop()
+{
+	if (g_autoNop)
+		BUF.push_back(FMT_OPCODE(MAESTRO_NOP));
+	else
+		fprintf(stderr, "%s:%d: warning: a padding NOP is required here\n", curFile, curLine);
+}
+
 DEF_COMMAND(format0)
 {
 	ENSURE_NO_MORE_ARGS();
@@ -1245,6 +1256,21 @@ DEF_DIRECTIVE(else)
 	if (elem.uExtra)
 		return throwError("spurious .else\n");
 
+	// Automatically add padding NOPs when necessary
+	if (lastWasEnd)
+	{
+		insertPaddingNop();
+		lastWasEnd = false;
+	} else
+	{
+		u32 p = BUF.size();
+		u32 lastOpcode = BUF[p-1] >> 26;
+		if (lastOpcode == MAESTRO_JMPC || lastOpcode == MAESTRO_JMPU
+			|| lastOpcode == MAESTRO_CALL || lastOpcode == MAESTRO_CALLC || lastOpcode == MAESTRO_CALLU
+			|| (p - elem.pos) < 2)
+			insertPaddingNop();
+	}
+
 	u32 curPos = BUF.size();
 	elem.uExtra = curPos;
 	u32& inst = BUF[elem.pos];
@@ -1265,6 +1291,24 @@ DEF_DIRECTIVE(end)
 		return throwError(".end with unmatched block\n");
 	
 	StackEntry& elem = g_stack[--g_stackPos];
+
+	// Automatically add padding NOPs when necessary
+	if (elem.type != SE_ARRAY && lastWasEnd)
+	{
+		insertPaddingNop();
+		lastWasEnd = false;
+	}
+	else if (elem.type == SE_PROC || elem.type == SE_FOR || elem.type == SE_IF && BUF.size() > 0)
+	{
+		u32 p = BUF.size();
+		u32 lastOpcode = BUF[p-1] >> 26;
+		if (lastOpcode == MAESTRO_JMPC || lastOpcode == MAESTRO_JMPU
+			|| lastOpcode == MAESTRO_CALL || lastOpcode == MAESTRO_CALLC || lastOpcode == MAESTRO_CALLU
+			|| (elem.type == SE_FOR && lastOpcode == MAESTRO_BREAKC)
+			|| (elem.type != SE_ARRAY && (p - elem.pos) < (elem.type != SE_PROC ? 2 : 1)))
+			insertPaddingNop();
+	}
+
 	u32 curPos = BUF.size();
 	u32 size = curPos - elem.pos;
 
@@ -1287,6 +1331,7 @@ DEF_DIRECTIVE(end)
 			u32& inst = BUF[elem.pos];
 			inst &= ~(0xFFF << 10);
 			inst |= (curPos-1) << 10;
+			lastWasEnd = true;
 			break;
 		}
 
@@ -1307,6 +1352,7 @@ DEF_DIRECTIVE(end)
 				inst &= ~0x3FF;
 				inst |= curPos - elem.uExtra;
 			}
+			lastWasEnd = true;
 			break;
 		}
 
@@ -1814,6 +1860,12 @@ int ProcessCommand(const char* cmd)
 		table = dirTable;
 	} else if (!g_stackPos)
 		return throwError("instruction outside block\n");
+	else
+	{
+		lastWasEnd = false;
+		if (!GetDvleData()->isGeoShader && g_outputBuf.size() >= MAX_VSH_SIZE)
+			return throwError("instruction outside vertex shader code memory (max %d instructions, currently %d)\n", MAX_VSH_SIZE, g_outputBuf.size());
+	}
 
 	for (int i = 0; table[i].name; i ++)
 		if (stricmp(table[i].name, cmd) == 0)

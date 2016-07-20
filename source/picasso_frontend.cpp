@@ -36,6 +36,7 @@ int usage(const char* prog)
 		"Options:\n"
 		"  -o, --out=<file>        Specifies the name of the SHBIN file to generate\n"
 		"  -h, --header=<file>     Specifies the name of the header file to generate\n"
+		"  -n, --no-nop            Disables the automatic insertion of padding NOPs\n"
 		"  -v, --version           Displays version information\n"
 		, prog);
 	return EXIT_FAILURE;
@@ -50,18 +51,20 @@ int main(int argc, char* argv[])
 		{ "out",    required_argument, NULL, 'o' },
 		{ "header", required_argument, NULL, 'h' },
 		{ "help",   no_argument,       NULL, '?' },
+		{ "no-nop", no_argument,       NULL, 'n' },
 		{ "version",no_argument,       NULL, 'v' },
 		{ NULL, 0, NULL, 0 }
 	};
 
 	int opt, optidx = 0;
-	while ((opt = getopt_long(argc, argv, "o:h:?v", long_options, &optidx)) != -1)
+	while ((opt = getopt_long(argc, argv, "o:h:?nv", long_options, &optidx)) != -1)
 	{
 		switch (opt)
 		{
 			case 'o': shbinFile = optarg; break;
 			case 'h': hFile     = optarg; break;
-			case '?':        usage(argv[0]); return EXIT_SUCCESS;
+			case '?': usage(argv[0]); return EXIT_SUCCESS;
+			case 'n': g_autoNop = false; break;
 			case 'v': printf("%s - Built on %s %s\n", PACKAGE_STRING, __DATE__, __TIME__); return EXIT_SUCCESS;
 			default:  return usage(argv[0]);
 		}
