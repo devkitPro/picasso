@@ -34,14 +34,14 @@ Directives are special statements that start with a period and control certain a
 
 PICA200 registers are often used as arguments to instructions. There exist the following registers:
 
-- `o0` through `o7`: Output registers (usable as a destination operand).
-- `v0` through `v7`: Input registers (usable as a source operand).
+- `o0` through `o6`: Output registers (usable as a destination operand).
+- `v0` through `v15`: Input registers (usable as a source operand).
 - `r0` through `r15`: Scratch registers (usable as both destination and source operands).
 - `c0` through `c95`: Floating-point vector uniforms (usable as a special type of source operand called SRC1).
 - `i0` through `i3`: Integer vector uniforms (special purpose).
 - `b0` through `b15`: Boolean uniforms (special purpose).
 
-All registers contain floating point vectors (it is currently unknown whether they are 24-bit or 32-bit); except for integer vector uniforms (containing 8-bit integers) and boolean uniforms. Vectors have 4 components: x, y, z and w. Uniforms are special registers that are writable by the CPU; thus they are used to pass configuration parameters to the shader such as transformation matrices. Sometimes they are preloaded with constant values that may be used in the logic of the shader.
+All registers contain floating point vectors (it is currently unknown whether they are 24-bit or 32-bit); except for integer vector uniforms (containing 8-bit integers) and boolean uniforms. Vectors have 4 components: x, y, z and w. The components may alternatively be referred to as r, g, b and a (respectively); or s, t, p and q (respectively). Uniforms are special registers that are writable by the CPU; thus they are used to pass configuration parameters to the shader such as transformation matrices. Sometimes they are preloaded with constant values that may be used in the logic of the shader.
 
 In most situations, vectors may be [swizzled](http://en.wikipedia.org/wiki/Swizzling_%28computer_graphics%29), that is; their components may be rearranged. Register arguments support specifying a swizzling mask: `r0.wwxy`. The swizzling mask usually has 4 components (but not more), if it has less the last component is repeated to fill the mask. The default mask applied to registers is `xyzw`; that is, identity (no effect).
 
@@ -55,6 +55,8 @@ Some source operands of instructions (called SRC1) support relative addressing. 
 
 Normal floating-point vector registers may also be negated by prepending a minus sign before it, e.g. `-r2` or `-someArray[lcnt+2]`.
 
+In geometry shaders, `b15` is automatically set to true *after* each execution of the geometry shader. This can be useful to detect whether program state should be initialized - GPU management code usually resets all unused boolean uniforms to false when setting up the PICA200's shader processing units.
+
 ## Command Line Usage
 
 ```
@@ -62,6 +64,7 @@ Usage: picasso [options] files...
 Options:
   -o, --out=<file>        Specifies the name of the SHBIN file to generate
   -h, --header=<file>     Specifies the name of the header file to generate
+  -n, --no-nop            Disables the automatic insertion of padding NOPs
   -v, --version           Displays version information
 ```
 
@@ -69,13 +72,23 @@ DVLEs are generated in the same order as the files in the command line.
 
 ## Linking Model
 
-`picasso` takes one or more source code files, and assembles them into a single `.shbin` file. A DVLE object is generated for each source code file, unless the `.nodvle` directive is used (see below). Procedures are shared amongst all source code files, and they may be defined and called wherever. Uniform space is also shared, that is, if two source code files declare the same uniform, they are assigned the same location. Constants however are not shared, and the same space is reused for the constants of each DVLE. Outputs and aliases are necessarily not shared either.
+`picasso` takes one or more source code files, and assembles them into a single `.shbin` file. A DVLE object is generated for each source code file, unless the `.nodvle` directive is used (see below). Procedures are shared amongst all source code files, and they may be defined and called wherever. Uniform space for vertex shaders is also shared, that is, if two vertex shader source code files declare the same uniform, they are assigned the same location. Geometry shaders however do not share uniforms, and each geometry shader source code file will have its own uniform allocation map. On the other hand, constants are never shared, and the same space is reused for the constants of each DVLE. Outputs and aliases are, by necessity, never shared either.
 
 The entry point of a DVLE may be set with the `.entry` directive. If this directive is not used, `main` is assumed as the entrypoint.
 
-A DVLE is marked by default as a vertex shader, unless `setemit` or `.gsh` are used (in the case of which a geometry shader is assumed).
+A DVLE by default is a vertex shader, unless the `.gsh` directive is used (in the case of which a geometry shader is specified).
 
 Uniforms that start with the underscore (`_`) character are not exposed in the DVLE table of uniforms. This allows for creating private uniforms that can be internally used to configure the behaviour of shared procedures.
+
+**Note**: Older versions of `picasso` handled geometry shaders in a different way. Specifically, uniform space was shared with vertex shaders and it was possible to use `.gsh` without parameters or `setemit` to flag a DVLE as a geometry shader. For backwards compatibility purposes this functionality has been retained, however its use is not recommended.
+
+## PICA200 Caveats & Errata
+
+The PICA200's shader units have numerous implementation caveats and errata that should be taken into account when designing and writing shader code. Some of these include:
+
+- Certain flow of control statements may not work at the end of another block, including the closing of other nested blocks. picasso detects these situations and automatically inserts padding NOP instructions (unless the `--no-nop` command line flag is used).
+- The `mova` instruction is finicky and for instance two consecutive `mova` instructions will freeze the PICA200.
+- Only a single input register is able to be referenced reliabily at a time in the source registers of an operand. That is, while specifying the same input register in one or more source registers will behave correctly, specifying different input registers will produce incorrect results. picasso detects this situation and displays an error message.
 
 ## Supported Directives
 
@@ -180,27 +193,30 @@ Optionally the size of the array may be specified. If a number of elements less 
 ### .out
 ```
 .out outName propName
+.out outName propName register
+.out - propName register
 ```
-Allocates a new output register, wires it to a certain output property and creates an alias for it that points to the allocated register. The following property names are supported:
+Wires an output register to a certain output property and (optionally) creates an alias for it called `outName` (specify a dash in order not to create the alias). If no output register is specified it is automatically allocated. The following property names are supported:
 
 - `position` (or `pos`): Represents the position of the outputted vertex.
-- `normalquat` (or `nquat`): Under investigation.
-- `color` (or `clr`): Represents the color of the outputted vertex. Its format is (R, G, B, xx) where R,G,B are values ranging from 0.0 to 1.0. The W component isn't used.
-- `texcoord0` (or `tcoord0`): Represents the texture coordinate that is fed to the Texture Unit 0. The Z and W components are not used.
-- `texcoord0w` (or `tcoord0w`): Under investigation.
-- `texcoord1` (or `tcoord1`): As `texcoord0`, but for the Texture Unit 1.
-- `texcoord2` (or `tcoord2`): As `texcoord0`, but for the Texture Unit 2.
-- `7`: Under investigation.
-- `view`: Under investigation.
+- `normalquat` (or `nquat`): Used in fragment lighting, this represents the quaternion associated to the normal vector of the vertex.
+- `color` (or `clr`): Represents the color of the outputted vertex. Its format is (R, G, B, xx) where R,G,B are values ranging from 0.0 to 1.0. The fourth component isn't used.
+- `texcoord0` (or `tcoord0`): Represents the first texture coordinate, which is always fed to the Texture Unit 0. Only the first two components are used.
+- `texcoord0w` (or `tcoord0w`): Represents the third component of the first texture coordinate, used for 3D/cube textures.
+- `texcoord1` (or `tcoord1`): Similarly to `texcoord0`, this is the second texture coordinate, which is usually but not always fed to Texture Unit 1.
+- `texcoord2` (or `tcoord2`): Similarly `texcoord0`, this is the third texture coordinate, which is usually but not always fed to Texture Unit 2.
+- `view`: Used in fragment lighting, this represents the view vector associated to the vertex. The fourth component is not used.
+- `dummy`: Used in vertex shaders to pass generic semanticless parameters to the geometry shader, and in geometry shaders to use the appropriate property type from the output map of the vertex shader, thus 'merging' the output maps.
 
-The properties also accept an output mask, e.g. `texcoord0.xy`.
+An output mask that specifies to which components of the output register should the property be wired to is also accepted. If the output register is explicitly specified, it attaches to it (e.g. `o2.xy`); otherwise it attaches to the property name (e.g. `texcoord0.xy`).
 
 Example:
 
 ```
 .out outPos position
-.out outClr color
-.out outTex texcoord0
+.out outClr color.rgb
+.out outTex texcoord0.xy
+.out -      texcoord0w outTex.p
 ```
 
 ### .entry
@@ -217,9 +233,27 @@ This directive tells `picasso` not to generate a DVLE for the source code file t
 
 ### .gsh
 ```
-.gsh
+.gsh point firstReg
+.gsh variable firstReg vtxNum
+.gsh fixed firstReg arrayStartReg vtxNum
 ```
-This directive explicitly flags the current DVLE as a geometry shader.
+This directive flags the current DVLE as a geometry shader and specifies the geometry shader operation mode, which can be one of the following:
+
+- `point` mode: In this mode the geometry shader is called according to the input stride and input permutation configured by the user. On entry, the data is stored starting at the `v0` register. This type of geometry shader can be used with both array-drawing mode (aka `C3D_DrawArrays`) and element-drawing mode (aka `C3D_DrawElements`).
+- `variable` mode (also called `subdivision` mode): In this mode the geometry shader processes variable-sized primitives, which are required to have `vtxNum` vertices for which full attribute information will be stored, and **one or more** additional vertices for which only position information will be stored. On entry the register `c0` stores in all its components the total number of vertices of the primitive, and subsequent registers store vertex information in order. This type of geometry shader can only used with element-drawing mode - inside the index array each primitive is prefixed with the number of vertices in it.
+- `fixed` mode (also called `particle` mode): In this mode the geometry shader processes fixed-size primitives, which always have `vtxNum` vertices. On entry, the array of vertex information will be stored starting at the float uniform register `arrayStartReg`. This type of geometry shader can only used with element-drawing mode.
+
+The `firstReg` parameter specifies the first float uniform register that is available for use in float uniform register allocation (this is especially useful in variable and fixed mode).
+
+Examples:
+
+```
+.gsh point c0
+.gsh variable c48 3
+.gsh fixed c48 c0 4
+```
+
+**Note**: For backwards compatibility reasons, a legacy mode which does not accept any parameters is accepted; however it should not be used.
 
 ### .setf
 ```
@@ -287,7 +321,7 @@ Syntax                            | Description
 	- In instructions that take one source operand, it is always wide.
 	- In instructions that take two source operands, the first is wide and the second is narrow.
 	- `dph`/`sge`/`slt` have a special form where the first operand is narrow and the second is wide. This usage is detected automatically by `picasso`.
-	- `mad`, which takes three source operands, has two forms: the first is narrow-wide-narrow, and the second is narrow-narrow-wide. This is also detected automatically. Additionally, relative addressing applies to the first source operand (which is narrow) instead of the single wide operand.
+	- `mad`, which takes three source operands, has two forms: the first is narrow-wide-narrow, and the second is narrow-narrow-wide. This is also detected automatically.
 - `idxReg`: Represents an indexing register to write to using the mova instruction. Can be `a0`, `a1` or `a01` (the latter writes to both `a0` and `a1`).
 - `iReg`: Represents an integer vector uniform source operand.
 - `bReg`: Represents a boolean uniform source operand.
@@ -300,12 +334,11 @@ Syntax                            | Description
 	- `le`: Less or equal than
 	- `gt`: Greater than
 	- `ge`: Greater or equal than
-	- `6` and `7`: currently unknown, supposedly the result they yield is always true.
 - `condExp`: Represents a conditional expression, which uses the conditional flags `cmp.x` and `cmp.y` set by the CMP instruction. These flags may be negated using the `!` symbol, e.g. `!cmp.x`. The conditional expression can take any of the following forms:
 	- `flag1`: It tests a single flag.
 	- `flag1 && flag2`: It performs AND between the two flags. Optionally, a single `&` may be specified.
 	- `flag1 || flag2`: It performs OR between the two flags. Optionally, a single `|` may be specified.
-- `vtxId`: An integer ranging from 0 to 3 specifying the vertex ID used in geoshader vertex emission.
+- `vtxId`: An integer ranging from 0 to 2 specifying the vertex ID used in geoshader vertex emission.
 - `emitFlags`: A space delimited combination of the following words:
-	- `primitive` (or `prim`): Specifies that after emitting the vertex, a primitive should also be emitted.
+	- `prim` (or `primitive`): Specifies that after emitting the vertex, a primitive should also be emitted.
 	- `inv` (or `invert`): Specifies that the order of the vertices in the emitted primitive is inverted.

@@ -1,5 +1,17 @@
 # picasso Changelog
 
+# v2.5
+
+- The `.gsh` directive has been enhanced to provide full support for all geometry shader operation modes (point, variable-sized primitive and fixed-size primitive). This also effectively separates vertex shader uniform space from geometry shader uniform space.
+- The `.out` directive has been enhanced to allow wiring semantics to any arbitrary output register. Additionally the `dummy` semantic was added while the `7` semantic was removed.
+- Added auto-insertion of NOP instruction in corner cases involving flow of control instructions, together with the `--no-nop` directive which instead of adding NOPs warns the user about the corner cases.
+- Added support for `rgba` and `stpq` in addition to `xyzw`.
+- Added an error message for invalid input register use (e.g. `add r0, v1, v2`).
+- The operand descriptor allocation algorithm has been enhanced to take into account unused operands.
+- The `6` and `7` conditional operators have been removed since they actually do not exist.
+- Really corrected MAD instruction encoding.
+- Several miscellaneous issues were fixed.
+
 # v2.4
 
 - Corrected MAD instruction encoding.
