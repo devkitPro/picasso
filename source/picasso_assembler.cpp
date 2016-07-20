@@ -785,6 +785,16 @@ static int parseCondExp(char* str, u32& outFlags)
 	return 0;
 }
 
+static inline bool isBadInputRegCombination(int a, int b)
+{
+	return a < 0x10 && b < 0x10 && a != b;
+}
+
+static inline bool isBadInputRegCombination(int a, int b, int c)
+{
+	return isBadInputRegCombination(a,b) || isBadInputRegCombination(b,c) || isBadInputRegCombination(c,a);
+}
+
 DEF_COMMAND(format0)
 {
 	ENSURE_NO_MORE_ARGS();
@@ -817,6 +827,9 @@ DEF_COMMAND(format1)
 		safe_call(ensure_no_idxreg(rSrc1Idx, 1));
 		safe_call(ensure_valid_src_wide(rSrc2, src2Name, 2));
 	}
+
+	if (isBadInputRegCombination(rSrc1, rSrc2))
+		return throwError("source operands must be different input registers (v0..v15)\n");
 
 	int opdesc = 0;
 	safe_call(findOrAddOpdesc(opcode, opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, 0), OPDESC_MASK_D12));
@@ -902,6 +915,9 @@ DEF_COMMAND(format5)
 		safe_call(ensure_valid_src_wide(rSrc3, src3Name, 3));
 		safe_call(ensure_no_idxreg(rSrc2Idx, 2));
 	}
+
+	if (isBadInputRegCombination(rSrc1, rSrc2, rSrc3))
+		return throwError("source registers must be different input registers (v0..v15)\n");
 
 	int opdesc = 0;
 	safe_call(findOrAddOpdesc(opcode, opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
