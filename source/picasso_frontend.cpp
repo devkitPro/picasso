@@ -169,12 +169,17 @@ int main(int argc, char* argv[])
 		curOff = 16*4;
 
 		f.WriteWord(0x454C5644); // DVLE
-		f.WriteHword(0); // padding?
-		f.WriteHword(dvle->isGeoShader ? 1 : 0); // Shader type
+		f.WriteHword(0x1002); // maybe version?
+		f.WriteByte(dvle->isGeoShader ? 1 : 0); // Shader type
+		f.WriteByte(dvle->isMerge ? 1 : 0);
 		f.WriteWord(dvle->entryStart); // offset to main
 		f.WriteWord(dvle->entryEnd); // offset to end of main
-		f.WriteWord(0); // ???
-		f.WriteWord(0); // ???
+		f.WriteHword(dvle->inputMask);
+		f.WriteHword(dvle->outputMask);
+		f.WriteByte(dvle->geoShaderType);
+		f.WriteByte(dvle->geoShaderFixedStart);
+		f.WriteByte(dvle->geoShaderVariableNum);
+		f.WriteByte(dvle->geoShaderFixedNum);
 		f.WriteWord(curOff); // offset to constant table
 		f.WriteWord(dvle->constantCount); // size of constant table
 		curOff += dvle->constantCount*5*4;
@@ -226,8 +231,11 @@ int main(int argc, char* argv[])
 			Uniform& u = dvle->uniformTable[i];
 			size_t l = u.name.length()+1;
 			f.WriteWord(sp); sp += l;
-			f.WriteHword(u.pos-0x10);
-			f.WriteHword(u.pos+u.size-1-0x10);
+			int pos = u.pos;
+			if (pos >= 0x20)
+				pos -= 0x10;
+			f.WriteHword(pos);
+			f.WriteHword(pos+u.size-1);
 		}
 
 		// Write symbols

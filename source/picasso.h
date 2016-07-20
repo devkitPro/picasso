@@ -109,6 +109,14 @@ struct Uniform
 	std::string name;
 	int pos, size;
 	int type;
+
+	void init(const char* name, int pos, int size, int type)
+	{
+		this->name = name;
+		this->pos = pos;
+		this->size = size;
+		this->type = type;
+	}
 };
 
 // List of uniforms
@@ -154,15 +162,22 @@ int RelocateProduct(void);
 
 enum
 {
-	OUTTYPE_POS = 0,
-	OUTTYPE_NQUAT,
-	OUTTYPE_CLR,
-	OUTTYPE_TCOORD0,
-	OUTTYPE_TCOORD0W,
-	OUTTYPE_TCOORD1,
-	OUTTYPE_TCOORD2,
-	OUTTYPE_7,
-	OUTTYPE_VIEW,
+	OUTTYPE_POS      = 0,
+	OUTTYPE_NQUAT    = 1,
+	OUTTYPE_CLR      = 2,
+	OUTTYPE_TCOORD0  = 3,
+	OUTTYPE_TCOORD0W = 4,
+	OUTTYPE_TCOORD1  = 5,
+	OUTTYPE_TCOORD2  = 6,
+	OUTTYPE_VIEW     = 8,
+	OUTTYPE_DUMMY    = 9,
+};
+
+enum
+{
+	GSHTYPE_POINT    = 0,
+	GSHTYPE_VARIABLE = 1,
+	GSHTYPE_FIXED    = 2,
 };
 
 struct Constant
@@ -183,7 +198,12 @@ struct DVLEData
 	std::string filename;
 	std::string entrypoint;
 	size_t entryStart, entryEnd;
-	bool nodvle, isGeoShader;
+	bool nodvle, isGeoShader, isCompatGeoShader, isMerge;
+	u16 inputMask, outputMask;
+	u8 geoShaderType;
+	u8 geoShaderFixedStart;
+	u8 geoShaderVariableNum;
+	u8 geoShaderFixedNum;
 
 	// Uniforms
 	Uniform uniformTable[MAX_UNIFORM];
@@ -196,12 +216,23 @@ struct DVLEData
 	int constantCount;
 
 	// Outputs
-	#define MAX_OUTPUT 8
+	#define MAX_OUTPUT 16
 	u64 outputTable[MAX_OUTPUT];
+	u32 outputUsedReg;
 	int outputCount;
+
+	bool usesGshSpace() { return isGeoShader && !isCompatGeoShader; }
+	int findFreeOutput()
+	{
+		for (int i = 0; i < 7; i ++)
+			if (!(outputMask & BIT(i)))
+				return i;
+		return -1;
+	}
 
 	DVLEData(const char* filename) :
 		filename(filename), entrypoint("main"),
-		nodvle(false), isGeoShader(false),
-		uniformCount(0), symbolSize(0), constantCount(0), outputCount(0) { }
+		nodvle(false), isGeoShader(false), isCompatGeoShader(false), isMerge(false),
+		inputMask(0), outputMask(0), geoShaderType(0), geoShaderFixedStart(0), geoShaderVariableNum(0), geoShaderFixedNum(0),
+		uniformCount(0), symbolSize(0), constantCount(0), outputUsedReg(0), outputCount(0) { }
 };

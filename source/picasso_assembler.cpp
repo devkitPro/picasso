@@ -32,6 +32,13 @@ class UniformAlloc
 public:
 	UniformAlloc(int start, int end) : start(start), end(end), bound(end), tend(end) { }
 	void ClearLocal(void) { end = tend; }
+	void Reinit(int start, int end)
+	{
+		this->start = start;
+		this->end = end;
+		this->bound = end;
+		this->tend = end;
+	}
 	int AllocGlobal(int size)
 	{
 		if ((start+size) > bound) return -1;
@@ -49,16 +56,39 @@ public:
 	}
 };
 
-static UniformAlloc fvecAlloc(0x20, 0x80), ivecAlloc(0x80, 0x84), boolAlloc(0x88, 0x98);
-
-static inline UniformAlloc& getAlloc(int type)
+struct UniformAllocBundle
 {
+	UniformAlloc fvecAlloc, ivecAlloc, boolAlloc;
+
+	UniformAllocBundle() :
+		fvecAlloc(0x20, 0x80), ivecAlloc(0x80, 0x84), boolAlloc(0x88, 0x98) { }
+
+	void clear()
+	{
+		fvecAlloc.ClearLocal();
+		ivecAlloc.ClearLocal();
+		boolAlloc.ClearLocal();
+	}
+
+	void initForGsh(int firstFree)
+	{
+		fvecAlloc.Reinit(firstFree, 0x80);
+		ivecAlloc.Reinit(0x80, 0x84);
+		boolAlloc.Reinit(0x88, 0x97);
+	}
+};
+
+static UniformAllocBundle unifAlloc[2];
+
+static inline UniformAlloc& getAlloc(int type, DVLEData* dvle)
+{
+	int x = dvle->usesGshSpace();
 	switch (type)
 	{
 		default:
-		case UTYPE_FVEC: return fvecAlloc;
-		case UTYPE_IVEC: return ivecAlloc;
-		case UTYPE_BOOL: return boolAlloc;
+		case UTYPE_FVEC: return unifAlloc[x].fvecAlloc;
+		case UTYPE_IVEC: return unifAlloc[x].ivecAlloc;
+		case UTYPE_BOOL: return unifAlloc[x].boolAlloc;
 	}
 }
 
@@ -75,9 +105,7 @@ static DVLEData* curDvle;
 
 static void ClearStatus(void)
 {
-	fvecAlloc.ClearLocal();
-	ivecAlloc.ClearLocal();
-	boolAlloc.ClearLocal();
+	unifAlloc[0].clear();
 	g_labels.clear();
 	g_labelRelocTable.clear();
 	g_aliases.clear();
@@ -1003,11 +1031,17 @@ DEF_COMMAND(formatsetemit)
 	bool isPrim, isInv;
 	safe_call(parseSetEmitFlags(flagStr, isPrim, isInv));
 
+	DVLEData* dvle = GetDvleData();
+	if (!dvle->isGeoShader)
+	{
+		dvle->isGeoShader = true;
+		dvle->isCompatGeoShader = true;
+	}
+
 #ifdef DEBUG
 	printf("%s:%02X vtx%d, %s, %s\n", cmdName, opcode, vtxId, isPrim?"true":"false", isInv?"true":"false");
 #endif
 	BUF.push_back(FMT_OPCODE(opcode) | ((u32)isInv<<22) | ((u32)isPrim<<23) | (vtxId<<24));
-	GetDvleData()->isGeoShader = true;
 
 	return 0;
 }
@@ -1362,7 +1396,7 @@ DEF_DIRECTIVE(end)
 			printf("ENDARRAY\n");
 #endif
 			DVLEData* dvle = GetDvleData();
-			UniformAlloc& alloc = getAlloc(UTYPE_FVEC);
+			UniformAlloc& alloc = getAlloc(UTYPE_FVEC, dvle);
 
 			if (g_aliases.find(g_constArrayName) != g_aliases.end())
 				return duplicateIdentifier(g_constArrayName);
@@ -1427,7 +1461,9 @@ DEF_DIRECTIVE(alias)
 
 DEF_DIRECTIVE(uniform)
 {
-	UniformAlloc& alloc = getAlloc(dirParam);
+	DVLEData* dvle = GetDvleData();
+	UniformAlloc& alloc = getAlloc(dirParam, dvle);
+	bool useSharedSpace = !dvle->usesGshSpace();
 
 	for (;;)
 	{
@@ -1457,7 +1493,7 @@ DEF_DIRECTIVE(uniform)
 
 		// Find the uniform in the table
 		int i;
-		for (i = 0; i < g_uniformCount; i ++)
+		for (i = 0; useSharedSpace && i < g_uniformCount; i ++)
 		{
 			Uniform& uniform = g_uniformTable[i];
 			if (uniform.name == argText)
@@ -1466,12 +1502,13 @@ DEF_DIRECTIVE(uniform)
 					return throwError("mismatched uniform type: %s\n", argText);
 				if (uniform.size != uSize)
 					return throwError("uniform '%s' previously declared as having size %d\n", argText, uniform.size);
+				uniformPos = uniform.pos;
 				break;
 			}
 		}
 
 		// If not found, create it
-		if (i == g_uniformCount && uniformPos < 0)
+		if (uniformPos < 0)
 		{
 			if (g_uniformCount == MAX_UNIFORM)
 				return throwError("too many global uniforms: %s\n", argText);
@@ -1481,28 +1518,22 @@ DEF_DIRECTIVE(uniform)
 				return throwError("not enough uniform space: %s[%d]\n", argText, uSize);
 		}
 
-		Uniform& uniform = g_uniformTable[g_uniformCount++];
-		uniform.name = argText;
-		uniform.pos = uniformPos;
-		uniform.size = uSize;
-		uniform.type = dirParam;
-		uniformPos += uSize;
+		if (useSharedSpace)
+			g_uniformTable[g_uniformCount++].init(argText, uniformPos, uSize, dirParam);
 
 		if (*argText != '_')
 		{
-			DVLEData* dvle = GetDvleData();
-
 			// Add the uniform to the table
 			if (dvle->uniformCount == MAX_UNIFORM)
 				return throwError("too many referenced uniforms: %s\n", argText);
-			dvle->uniformTable[dvle->uniformCount++] = uniform; // Copy constructor
+			dvle->uniformTable[dvle->uniformCount++].init(argText, uniformPos, uSize, dirParam);
 			dvle->symbolSize += strlen(argText)+1;
 		}
 
-		g_aliases.insert( std::pair<std::string,int>(argText, uniform.pos | (DEFAULT_OPSRC<<8)) );
+		g_aliases.insert( std::pair<std::string,int>(argText, uniformPos | (DEFAULT_OPSRC<<8)) );
 
 #ifdef DEBUG
-		printf("uniform %s[%d] @ d%02X:d%02X\n", argText, uSize, uniform.pos, uniform.pos+uSize-1);
+		printf("uniform %s[%d] @ d%02X:d%02X\n", argText, uSize, uniformPos, uniformPos+uSize-1);
 #endif
 	}
 	return 0;
@@ -1511,7 +1542,7 @@ DEF_DIRECTIVE(uniform)
 DEF_DIRECTIVE(const)
 {
 	DVLEData* dvle = GetDvleData();
-	UniformAlloc& alloc = getAlloc(dirParam);
+	UniformAlloc& alloc = getAlloc(dirParam, dvle);
 
 	NEXT_ARG_CPAREN(constName);
 	NEXT_ARG(arg0Text);
@@ -1739,10 +1770,10 @@ static int parseOutType(const char* text)
 		return OUTTYPE_TCOORD1;
 	if (stricmp(text,"tcoord2")==0 || stricmp(text,"texcoord2")==0)
 		return OUTTYPE_TCOORD2;
-	if (stricmp(text,"7")==0)
-		return OUTTYPE_7;
 	if (stricmp(text,"view")==0)
 		return OUTTYPE_VIEW;
+	if (stricmp(text,"dummy")==0)
+		return OUTTYPE_DUMMY;
 	return -1;
 }
 
@@ -1752,39 +1783,65 @@ DEF_DIRECTIVE(out)
 
 	NEXT_ARG_SPC(outName);
 	NEXT_ARG_SPC(outType);
+	char* outDestRegName = nextArgSpc();
 	ENSURE_NO_MORE_ARGS();
 
-	if (!validateIdentifier(outName))
+	int oid = -1;
+	int sw = DEFAULT_OPSRC;
+
+	if (outName[0]=='-' && !outName[1])
+		outName = NULL;
+	else if (!validateIdentifier(outName))
 		return throwError("invalid identifier: %s\n", outName);
 
-	int sw = DEFAULT_OPSRC;
-	char* dotPos = strchr(outType, '.');
-	if (dotPos)
+	if (outDestRegName)
 	{
-		*dotPos++ = 0;
-		sw = parseSwizzling(dotPos);
-		if (sw < 0)
-			return throwError("invalid output mask: %s\n", dotPos);
+		ARG_TO_REG(outDestReg, outDestRegName);
+		if (outDestReg < 0x00 || outDestReg >= 0x07)
+			return throwError("invalid output register: %s\n", outDestRegName);
+		oid = outDestReg;
+		sw = outDestRegSw;
 	}
+
+	if (oid < 0)
+	{
+		char* dotPos = strchr(outType, '.');
+		if (dotPos)
+		{
+			*dotPos++ = 0;
+			sw = parseSwizzling(dotPos);
+			if (sw < 0)
+				return throwError("invalid output mask: %s\n", dotPos);
+		}
+	}
+
 	int mask = maskFromSwizzling(sw, false);
 	int type = parseOutType(outType);
 	if (type < 0)
 		return throwError("invalid output type: %s\n", outType);
 
-	if (dvle->outputCount==MAX_OUTPUT)
+	if (oid < 0)
+		oid = dvle->findFreeOutput();
+	else if (dvle->outputUsedReg & (mask << (4*oid)))
+		return throwError("this output collides with another one previously defined\n");
+
+	if (oid < 0 || dvle->outputCount==MAX_OUTPUT)
 		return throwError("too many outputs\n");
 
-	if (g_aliases.find(outName) != g_aliases.end())
+	if (outName && g_aliases.find(outName) != g_aliases.end())
 		return duplicateIdentifier(outName);
-
-	int oid = dvle->outputCount;
 
 #ifdef DEBUG
 	printf("output %s <- o%d (%d:%X)\n", outName, oid, type, mask);
 #endif
 
 	dvle->outputTable[dvle->outputCount++] = OUTPUT_MAKE(type, oid, mask);
-	g_aliases.insert( std::pair<std::string,int>(outName, oid | (sw<<8)) );
+	dvle->outputMask |= BIT(oid);
+	dvle->outputUsedReg |= mask << (4*oid);
+	if (outName)
+		g_aliases.insert( std::pair<std::string,int>(outName, oid | (DEFAULT_OPSRC<<8)) );
+	if (type == OUTTYPE_DUMMY && dvle->usesGshSpace())
+		dvle->isMerge = true;
 	return 0;
 }
 
@@ -1816,15 +1873,81 @@ DEF_DIRECTIVE(nodvle)
 	return 0;
 }
 
+static inline int parseGshType(const char* text)
+{
+	if (stricmp(text,"point")==0)
+		return GSHTYPE_POINT;
+	if (stricmp(text,"variable")==0 || stricmp(text,"subdivision")==0)
+		return GSHTYPE_VARIABLE;
+	if (stricmp(text,"fixed")==0 || stricmp(text,"particle")==0)
+		return GSHTYPE_FIXED;
+	return -1;
+}
+
 DEF_DIRECTIVE(gsh)
 {
 	DVLEData* dvle = GetDvleData();
-	ENSURE_NO_MORE_ARGS();
+	char* gshMode = nextArgSpc();
+	if (!gshMode)
+	{
+		dvle->isGeoShader = true;
+		dvle->isCompatGeoShader = true;
+		return 0;
+	}
 
-	if (dvle->nodvle)
-		return throwError(".gsh has no effect if .nodvle is used\n");
+	if (dvle->isGeoShader)
+		return throwError(".gsh had already been used\n");
+	if (dvle->constantCount || dvle->uniformCount || dvle->outputMask)
+		return throwError(".gsh must be used before any constant, uniform or output is declared\n");
+
+	int mode = parseGshType(gshMode);
+	if (mode < 0)
+		return throwError("invalid geometry shader mode: %s\n", gshMode);
 
 	dvle->isGeoShader = true;
+	dvle->geoShaderType = mode;
+
+	NEXT_ARG_SPC(firstFreeRegName);
+	ARG_TO_REG(firstFreeReg, firstFreeRegName);
+	if (firstFreeReg < 0x20 || firstFreeReg >= 0x80)
+		return throwError("invalid float uniform register: %s\n", firstFreeRegName);
+
+	unifAlloc[1].initForGsh(firstFreeReg);
+
+	switch (mode)
+	{
+		case GSHTYPE_POINT:
+			ENSURE_NO_MORE_ARGS();
+			break;
+		case GSHTYPE_VARIABLE:
+		{
+			NEXT_ARG_SPC(vtxNumText);
+			ENSURE_NO_MORE_ARGS();
+
+			ARG_TO_INT(vtxNum, vtxNumText, 0, 255);
+			dvle->geoShaderVariableNum = vtxNum;
+			break;
+		}
+		case GSHTYPE_FIXED:
+		{
+			NEXT_ARG_SPC(arrayStartText);
+			NEXT_ARG_SPC(vtxNumText);
+			ENSURE_NO_MORE_ARGS();
+
+			ARG_TO_REG(arrayStart, arrayStartText);
+			ARG_TO_INT(vtxNum, vtxNumText, 0, 255);
+
+			if (arrayStart < 0x20 || arrayStart >= 0x80)
+				return throwError("invalid float uniform register: %s\n", arrayStartText);
+			if (arrayStart >= firstFreeReg)
+				return throwError("specified location overlaps uniform allocation pool: %s\n", arrayStartText);
+
+			dvle->geoShaderFixedStart = arrayStart - 0x20;
+			dvle->geoShaderFixedNum = vtxNum;
+			break;
+		}
+	}
+
 	return 0;
 }
 
