@@ -496,10 +496,10 @@ static int parseSwizzling(const char* b)
 	{
 		switch (tolower(b[i]))
 		{
-			case 'x': q = COMP_X; break;
-			case 'y': q = COMP_Y; break;
-			case 'z': q = COMP_Z; break;
-			case 'w': q = COMP_W; break;
+			case 'x': case 'r': case 's': q = COMP_X; break;
+			case 'y': case 'g': case 't': q = COMP_Y; break;
+			case 'z': case 'b': case 'p': q = COMP_Z; break;
+			case 'w': case 'a': case 'q': q = COMP_W; break;
 			default: return -1;
 		}
 		out |= SWIZZLE_COMP(i, q);
