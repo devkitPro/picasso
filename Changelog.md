@@ -1,5 +1,12 @@
 # picasso Changelog
 
+# v2.6
+
+- Added `.in` directive for explicit specifying (and allocating) input registers and exporting them in the DVLE uniform table.
+- Added support for dollar signs (`$`) in identifier names, which are translated to period characters (`.`) in DVLE uniform names.
+- Output registers `o7` through `o15` are now allowed in vertex shaders (as dummy outputs).
+- DVLE uniform table is now sorted by register position.
+
 # v2.5
 
 - The `.gsh` directive has been enhanced to provide full support for all geometry shader operation modes (point, variable-sized primitive and fixed-size primitive). This also effectively separates vertex shader uniform space from geometry shader uniform space.

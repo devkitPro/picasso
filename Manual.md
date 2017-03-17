@@ -9,7 +9,7 @@ Comments are introduced by the semicolon character. E.g.
 .fvec myFloat ; They can also appear in the same line
 ```
 
-Identifiers follow the same rules as C identifiers.
+Identifiers follow the same rules as C identifiers. Additionally, the dollar sign (`$`) is allowed in identifiers; mostly as a substitute for the period character (`.`) since the latter is used in `picasso` syntax.
 
 Labels consist of an identifier plus a colon. E.g.
 
@@ -34,14 +34,14 @@ Directives are special statements that start with a period and control certain a
 
 PICA200 registers are often used as arguments to instructions. There exist the following registers:
 
-- `o0` through `o6`: Output registers (usable as a destination operand).
+- `o0` through `o15`: Output registers (usable as a destination operand). The range `o7` through `o15` is only available in vertex shaders.
 - `v0` through `v15`: Input registers (usable as a source operand).
 - `r0` through `r15`: Scratch registers (usable as both destination and source operands).
 - `c0` through `c95`: Floating-point vector uniforms (usable as a special type of source operand called SRC1).
 - `i0` through `i3`: Integer vector uniforms (special purpose).
 - `b0` through `b15`: Boolean uniforms (special purpose).
 
-All registers contain floating point vectors (it is currently unknown whether they are 24-bit or 32-bit); except for integer vector uniforms (containing 8-bit integers) and boolean uniforms. Vectors have 4 components: x, y, z and w. The components may alternatively be referred to as r, g, b and a (respectively); or s, t, p and q (respectively). Uniforms are special registers that are writable by the CPU; thus they are used to pass configuration parameters to the shader such as transformation matrices. Sometimes they are preloaded with constant values that may be used in the logic of the shader.
+All registers contain 24-bit floating point vectors; except for integer vector uniforms (containing 8-bit integers) and boolean uniforms. Vectors have 4 components: x, y, z and w. The components may alternatively be referred to as r, g, b and a (respectively); or s, t, p and q (respectively). Uniforms are special registers that are writable by the CPU; thus they are used to pass configuration parameters to the shader such as transformation matrices. Sometimes they are preloaded with constant values that may be used in the logic of the shader.
 
 In most situations, vectors may be [swizzled](http://en.wikipedia.org/wiki/Swizzling_%28computer_graphics%29), that is; their components may be rearranged. Register arguments support specifying a swizzling mask: `r0.wwxy`. The swizzling mask usually has 4 components (but not more), if it has less the last component is repeated to fill the mask. The default mask applied to registers is `xyzw`; that is, identity (no effect).
 
@@ -78,7 +78,7 @@ The entry point of a DVLE may be set with the `.entry` directive. If this direct
 
 A DVLE by default is a vertex shader, unless the `.gsh` directive is used (in the case of which a geometry shader is specified).
 
-Uniforms that start with the underscore (`_`) character are not exposed in the DVLE table of uniforms. This allows for creating private uniforms that can be internally used to configure the behaviour of shared procedures.
+Uniforms that start with the underscore (`_`) character are not exposed in the DVLE table of uniforms. This allows for creating private uniforms that can be internally used to configure the behaviour of shared procedures. Additionally, dollar signs (`$`) are automatically translated to period characters (`.`) in the DVLE uniform table.
 
 **Note**: Older versions of `picasso` handled geometry shaders in a different way. Specifically, uniform space was shared with vertex shaders and it was possible to use `.gsh` without parameters or `setemit` to flag a DVLE as a geometry shader. For backwards compatibility purposes this functionality has been retained, however its use is not recommended.
 
@@ -188,6 +188,21 @@ Optionally the size of the array may be specified. If a number of elements less 
 .constfa (5.0, 6.0, 7.0, 8.0)
 ; The remaining two elements are vectors full of zeroes.
 .end
+```
+
+### .in
+```
+.in inName
+.in inName register
+```
+Reserves an input register and creates an alias for it called `inName`. If no input register is specified it is automatically allocated. The input register is added to the DVLE's uniform table.
+
+Example:
+
+```
+.in position
+.in texcoord
+.in special v15
 ```
 
 ### .out
