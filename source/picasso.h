@@ -235,6 +235,14 @@ struct DVLEData
 		return -1;
 	}
 
+	int findFreeInput()
+	{
+		for (int i = 0; i < 16; i ++)
+			if (!(inputMask & BIT(i)))
+				return i;
+		return -1;
+	}
+
 	int maxOutputReg() const
 	{
 		return isGeoShader ? 0x07 : 0x10;

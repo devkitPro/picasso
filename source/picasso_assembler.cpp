@@ -1777,6 +1777,40 @@ static int parseOutType(const char* text)
 	return -1;
 }
 
+DEF_DIRECTIVE(in)
+{
+	DVLEData* dvle = GetDvleData();
+
+	NEXT_ARG_SPC(inName);
+	char* inRegName = nextArgSpc();
+	ENSURE_NO_MORE_ARGS();
+
+	if (!validateIdentifier(inName))
+		return throwError("invalid identifier: %s\n", inName);
+	if (g_aliases.find(inName) != g_aliases.end())
+		return duplicateIdentifier(inName);
+
+	int oid = -1;
+	if (inRegName)
+	{
+		ARG_TO_REG(inReg, inRegName);
+		if (inReg < 0x00 || inReg >= 0x10)
+			return throwError("invalid input register: %s\n", inReg);
+		oid = inReg;
+	} else
+		oid = dvle->findFreeInput();
+	if (oid < 0)
+		return throwError("too many inputs\n");
+	if (dvle->uniformCount == MAX_UNIFORM)
+		return throwError("too many uniforms in DVLE\n");
+
+	dvle->inputMask |= BIT(oid);
+	dvle->uniformTable[dvle->uniformCount++].init(inName, oid, 1, UTYPE_FVEC);
+	dvle->symbolSize += strlen(inName)+1;
+	g_aliases.insert( std::pair<std::string,int>(inName, oid | (DEFAULT_OPSRC<<8)) );
+	return 0;
+}
+
 DEF_DIRECTIVE(out)
 {
 	DVLEData* dvle = GetDvleData();
@@ -1967,6 +2001,7 @@ static const cmdTableType dirTable[] =
 	DEC_DIRECTIVE2(constf, const, UTYPE_FVEC),
 	DEC_DIRECTIVE2(consti, const, UTYPE_IVEC),
 	DEC_DIRECTIVE(constfa),
+	DEC_DIRECTIVE(in),
 	DEC_DIRECTIVE(out),
 	DEC_DIRECTIVE(entry),
 	DEC_DIRECTIVE(nodvle),
