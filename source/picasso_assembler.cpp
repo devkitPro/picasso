@@ -177,7 +177,7 @@ static bool validateIdentifier(const char* id)
 	for (int i = 0; valid && i < len; i ++)
 	{
 		int c = id[i];
-		valid = isalpha(c) || c == '_' || c == '.' || (i > 0 && isdigit(c));
+		valid = isalpha(c) || c == '_' || c == '$' || (i > 0 && isdigit(c));
 	}
 	return valid;
 }

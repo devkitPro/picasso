@@ -110,6 +110,11 @@ struct Uniform
 	int pos, size;
 	int type;
 
+	inline bool operator <(const Uniform& rhs)
+	{
+		return pos < rhs.pos;
+	}
+
 	void init(const char* name, int pos, int size, int type)
 	{
 		this->name = name;

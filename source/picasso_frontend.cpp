@@ -195,6 +195,9 @@ int main(int argc, char* argv[])
 		u32 temp = f.Tell();
 		f.WriteWord(dvle->symbolSize); // size of symbol table
 
+		// Sort uniforms by position
+		std::sort(dvle->uniformTable, dvle->uniformTable + dvle->uniformCount);
+
 		// Write constants
 		for (int i = 0; i < dvle->constantCount; i ++)
 		{
@@ -241,7 +244,8 @@ int main(int argc, char* argv[])
 		// Write symbols
 		for (int i = 0; i < dvle->uniformCount; i ++)
 		{
-			std::string& u = dvle->uniformTable[i].name;
+			std::string u(dvle->uniformTable[i].name);
+			std::replace(u.begin(), u.end(), '$', '.');
 			size_t l = u.length()+1;
 			f.WriteRaw(u.c_str(), l);
 		}
