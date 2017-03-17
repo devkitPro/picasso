@@ -737,7 +737,7 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 	switch (*pos)
 	{
 		case 'o': // Output registers
-			if (outReg < 0x00 || outReg >= 0x07)
+			if (outReg < 0x00 || outReg >= GetDvleData()->maxOutputReg())
 				return throwError("invalid output register: %s\n", pos);
 			break;
 		case 'v': // Input attributes
@@ -1797,7 +1797,7 @@ DEF_DIRECTIVE(out)
 	if (outDestRegName)
 	{
 		ARG_TO_REG(outDestReg, outDestRegName);
-		if (outDestReg < 0x00 || outDestReg >= 0x07)
+		if (outDestReg < 0x00 || outDestReg >= dvle->maxOutputReg())
 			return throwError("invalid output register: %s\n", outDestRegName);
 		oid = outDestReg;
 		sw = outDestRegSw;
@@ -1830,6 +1830,9 @@ DEF_DIRECTIVE(out)
 
 	if (outName && g_aliases.find(outName) != g_aliases.end())
 		return duplicateIdentifier(outName);
+
+	if (oid >= 7 && type != OUTTYPE_DUMMY)
+		return throwError("this register (o%d) can only be a dummy output\n", oid);
 
 #ifdef DEBUG
 	printf("output %s <- o%d (%d:%X)\n", outName, oid, type, mask);

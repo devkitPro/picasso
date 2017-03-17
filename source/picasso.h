@@ -229,10 +229,15 @@ struct DVLEData
 	bool usesGshSpace() { return isGeoShader && !isCompatGeoShader; }
 	int findFreeOutput()
 	{
-		for (int i = 0; i < 7; i ++)
+		for (int i = 0; i < maxOutputReg(); i ++)
 			if (!(outputMask & BIT(i)))
 				return i;
 		return -1;
+	}
+
+	int maxOutputReg() const
+	{
+		return isGeoShader ? 0x07 : 0x10;
 	}
 
 	DVLEData(const char* filename) :
