@@ -16,6 +16,7 @@ int g_stackPos;
 int g_opdescTable[MAX_OPDESC];
 int g_opdescCount;
 int g_opdescMasks[MAX_OPDESC];
+u32 g_opdescIsMad;
 
 Uniform g_uniformTable[MAX_UNIFORM];
 int g_uniformCount;
@@ -630,6 +631,26 @@ static int findOrAddOpdesc(int opcode, int& out, int opdesc, int mask)
 	return 0;
 }
 
+static void swapOpdesc(u32 from, u32 to)
+{
+	std::swap(g_opdescTable[from], g_opdescTable[to]);
+	std::swap(g_opdescMasks[from], g_opdescMasks[to]);
+	for (size_t i = 0; i < BUF.size(); i ++)
+	{
+		u32& opword = BUF[i];
+		u32 opcode = opword>>26;
+		if (opcode < 0x20 || (opcode&~1)==MAESTRO_CMP)
+		{
+			u32 cur_opdesc = opword & 0x7F;
+			if (cur_opdesc==from)
+				cur_opdesc=to;
+			else if (cur_opdesc==to)
+				cur_opdesc=from;
+			opword = (opword &~ 0x7F) | cur_opdesc;
+		}
+	}
+}
+
 static inline bool isregp(int x)
 {
 	x = tolower(x);
@@ -962,7 +983,18 @@ DEF_COMMAND(format5)
 	safe_call(findOrAddOpdesc(opcode, opdesc, OPDESC_MAKE(maskFromSwizzling(rDestSw), rSrc1Sw, rSrc2Sw, rSrc3Sw), OPDESC_MASK_D123));
 
 	if (opdesc >= 32)
-		return throwError("opdesc allocation error\n");
+	{
+		int which;
+		for (which; which < 32; which ++)
+			if (!(g_opdescIsMad & BIT(which)))
+				break;
+		if (which == 32)
+			return throwError("opdesc allocation error\n");
+		swapOpdesc(which, opdesc);
+		opdesc = which;
+	}
+
+	g_opdescIsMad |= BIT(opdesc);
 
 #ifdef DEBUG
 	printf("%s:%02X d%02X, d%02X, d%02X, d%02X (0x%X)\n", cmdName, opcode, rDest, rSrc1, rSrc2, rSrc3, opdesc);
