@@ -1,5 +1,9 @@
 # picasso Changelog
 
+# v2.6.1
+
+- Reduced `mad` opdesc allocation errors by automatically swapping out of bounds opdesc entries with other ones in the addressable range (5 bits).
+
 # v2.6
 
 - Added `.in` directive for explicit specifying (and allocating) input registers and exporting them in the DVLE uniform table.
