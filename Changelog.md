@@ -1,5 +1,9 @@
 # picasso Changelog
 
+# v2.6.2
+
+- Fixed several compilation errors in some compilers.
+
 # v2.6.1
 
 - Reduced `mad` opdesc allocation errors by automatically swapping out of bounds opdesc entries with other ones in the addressable range (5 bits).
