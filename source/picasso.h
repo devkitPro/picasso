@@ -110,7 +110,7 @@ struct Uniform
 	int pos, size;
 	int type;
 
-	inline bool operator <(const Uniform& rhs)
+	inline bool operator <(const Uniform& rhs) const
 	{
 		return pos < rhs.pos;
 	}

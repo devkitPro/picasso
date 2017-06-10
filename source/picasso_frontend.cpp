@@ -1,21 +1,41 @@
 #include "picasso.h"
 
-// !! Taken from ctrulib !!
-u32 f32tof24(float vf)
+static inline uint32_t floatrawbits(float f)
 {
-	if (!vf) return 0;
+	union { float f; uint32_t i; } s;
+	s.f = f;
+	return s.i;
+}
 
-	union { float f; u32 v; } q;
-	q.f=vf;
+// f24 has:
+//  - 1 sign bit
+//  - 7 exponent bits
+//  - 16 mantissa bits
+uint32_t f32tof24(float f)
+{
+	uint32_t i = floatrawbits(f);
 
-	u8 s = q.v>>31;
-	u32 exp = ((q.v>>23) & 0xFF) - 0x40;
-	u32 man = (q.v>>7) & 0xFFFF;
+	uint32_t mantissa = (i << 9) >>  9;
+	int32_t  exponent = (i << 1) >> 24;
+	uint32_t sign     = (i << 0) >> 31;
 
-	if (exp >= 0)
-		return man | (exp<<16) | (s<<23);
-	else
-		return s<<23;
+	// Truncate mantissa
+	mantissa >>= 7;
+
+	// Re-bias exponent
+	exponent = exponent - 127 + 63;
+	if (exponent < 0)
+	{
+		// Underflow: flush to zero
+		return sign << 23;
+	}
+	else if (exponent > 0x7F)
+	{
+		// Overflow: saturate to infinity
+		return (sign << 23) | (0x7F << 16);
+	}
+
+	return (sign << 23) | (exponent << 16) | mantissa;
 }
 
 #ifdef WIN32
