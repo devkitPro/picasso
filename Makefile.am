@@ -4,6 +4,7 @@ bin_PROGRAMS = picasso
 _common_SOURCES	=	source/FileClass.h source/maestro_opcodes.h source/types.h
 picasso_SOURCES	=	source/picasso_assembler.cpp source/picasso_frontend.cpp source/picasso.h $(_common_SOURCES)
 picasso_CXXFLAGS	=
+picasso_LDFLAGS = -static-libstdc++ -static-libgcc 
 
 
 EXTRA_DIST = autogen.sh
