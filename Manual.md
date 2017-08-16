@@ -215,7 +215,7 @@ Wires an output register to a certain output property and (optionally) creates a
 
 - `position` (or `pos`): Represents the position of the outputted vertex.
 - `normalquat` (or `nquat`): Used in fragment lighting, this represents the quaternion associated to the normal vector of the vertex.
-- `color` (or `clr`): Represents the color of the outputted vertex. Its format is (R, G, B, xx) where R,G,B are values ranging from 0.0 to 1.0. The fourth component isn't used.
+- `color` (or `clr`): Represents the color of the outputted vertex. Its format is (R, G, B, A) where R,G,B,A are values ranging from 0.0 to 1.0.
 - `texcoord0` (or `tcoord0`): Represents the first texture coordinate, which is always fed to the Texture Unit 0. Only the first two components are used.
 - `texcoord0w` (or `tcoord0w`): Represents the third component of the first texture coordinate, used for 3D/cube textures.
 - `texcoord1` (or `tcoord1`): Similarly to `texcoord0`, this is the second texture coordinate, which is usually but not always fed to Texture Unit 1.
@@ -229,7 +229,7 @@ Example:
 
 ```
 .out outPos position
-.out outClr color.rgb
+.out outClr color.rgba
 .out outTex texcoord0.xy
 .out -      texcoord0w outTex.p
 ```
