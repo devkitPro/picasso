@@ -161,7 +161,7 @@ Reserves a new floating-point vector uniform to be preloaded with the specified 
 Reserves a new integer vector uniform to be preloaded with the specified constant; creates an alias for it that points to the allocated register. Example:
 
 ```
-.constf loopParams(16, 0, 1, 0)
+.consti loopParams(16, 0, 1, 0)
 ```
 
 ### .constfa
@@ -309,7 +309,6 @@ Syntax                            | Description
 `min rDest, rSrc1, rSrc2`         |
 `ex2 rDest, rSrc1`                |
 `lg2 rDest, rSrc1`                |
-`ex2 rDest, rSrc1`                |
 `flr rDest, rSrc1`                |
 `rcp rDest, rSrc1`                |
 `rsq rDest, rSrc1`                |
