@@ -2057,7 +2057,7 @@ int ProcessCommand(const char* cmd)
 	else
 	{
 		lastWasEnd = false;
-		if (!GetDvleData()->isGeoShader && g_outputBuf.size() >= MAX_VSH_SIZE)
+		if (!GetDvleData()->isGeoShader && g_outputBuf.size() > MAX_VSH_SIZE)
 			return throwError("instruction outside vertex shader code memory (max %d instructions, currently %d)\n", MAX_VSH_SIZE, g_outputBuf.size());
 	}
 
