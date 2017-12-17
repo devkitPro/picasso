@@ -1256,6 +1256,7 @@ static const cmdTableType cmdTable[] =
 
 	DEC_COMMAND(EX2, format1u),
 	DEC_COMMAND(LG2, format1u),
+	DEC_COMMAND(LITP, format1u),
 	DEC_COMMAND(FLR, format1u),
 	DEC_COMMAND(RCP, format1u),
 	DEC_COMMAND(RSQ, format1u),

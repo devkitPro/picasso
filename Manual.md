@@ -310,6 +310,7 @@ Syntax                            | Description
 `min rDest, rSrc1, rSrc2`         |
 `ex2 rDest, rSrc1`                |
 `lg2 rDest, rSrc1`                |
+`litp rDest, rSrc1`               |
 `flr rDest, rSrc1`                |
 `rcp rDest, rSrc1`                |
 `rsq rDest, rSrc1`                |
