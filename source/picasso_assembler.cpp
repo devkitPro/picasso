@@ -1242,6 +1242,7 @@ static const cmdTableType cmdTable[] =
 	DEC_COMMAND(NOP, format0),
 	DEC_COMMAND(END, format0),
 	DEC_COMMAND(EMIT, format0),
+	DEC_COMMAND(BREAK, format0),
 
 	DEC_COMMAND(ADD, format1),
 	DEC_COMMAND(DP3, format1),
@@ -1373,6 +1374,7 @@ DEF_DIRECTIVE(end)
 		u32 lastOpcode = BUF[p-1] >> 26;
 		if (lastOpcode == MAESTRO_JMPC || lastOpcode == MAESTRO_JMPU
 			|| lastOpcode == MAESTRO_CALL || lastOpcode == MAESTRO_CALLC || lastOpcode == MAESTRO_CALLU
+			|| (elem.type == SE_FOR && lastOpcode == MAESTRO_BREAK)
 			|| (elem.type == SE_FOR && lastOpcode == MAESTRO_BREAKC)
 			|| (elem.type != SE_ARRAY && (p - elem.pos) < (elem.type != SE_PROC ? 2 : 1)))
 			insertPaddingNop();
