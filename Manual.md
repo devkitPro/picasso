@@ -302,6 +302,7 @@ Syntax                            | Description
 `dp3 rDest, rSrc1, rSrc2`         |
 `dp4 rDest, rSrc1, rSrc2`         |
 `dph rDest, rSrc1, rSrc2`         |
+`dst rDest, rSrc1, rSrc2`         |
 `mul rDest, rSrc1, rSrc2`         |
 `sge rDest, rSrc1, rSrc2`         |
 `slt rDest, rSrc1, rSrc2`         |
