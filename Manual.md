@@ -319,6 +319,7 @@ Syntax                            | Description
 `cmp rSrc1, opx, opy, rSrc2`      |
 `call procName`                   |
 `for iReg`                        |
+`break`                           | (not recommended)
 `breakc condExp`                  |
 `callc condExp, procName`         |
 `ifc condExp`                     |
