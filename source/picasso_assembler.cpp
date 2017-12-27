@@ -661,7 +661,7 @@ static inline int convertIdxRegName(const char* reg)
 {
 	if (stricmp(reg, "a0")==0 || stricmp(reg, "a0.x")==0) return 1;
 	if (stricmp(reg, "a1")==0 || stricmp(reg, "a0.y")==0) return 2;
-	if (stricmp(reg, "a2")==0 || stricmp(reg, "lcnt")==0) return 3;
+	if (stricmp(reg, "a2")==0 || stricmp(reg, "lcnt")==0 || stricmp(reg, "aL")==0) return 3;
 	return 0;
 }
 
