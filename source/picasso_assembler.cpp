@@ -659,8 +659,8 @@ static inline bool isregp(int x)
 
 static inline int convertIdxRegName(const char* reg)
 {
-	if (stricmp(reg, "a0")==0) return 1;
-	if (stricmp(reg, "a1")==0) return 2;
+	if (stricmp(reg, "a0")==0 || stricmp(reg, "a0.x")==0) return 1;
+	if (stricmp(reg, "a1")==0 || stricmp(reg, "a0.y")==0) return 2;
 	if (stricmp(reg, "a2")==0 || stricmp(reg, "lcnt")==0) return 3;
 	return 0;
 }
@@ -686,22 +686,15 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 		pos++;
 		outSw |= 1; // negation bit
 	}
-	char* dotPos = strchr(pos, '.');
-	if (dotPos)
-	{
-		*dotPos++ = 0;
-		outSw = parseSwizzling(dotPos) | (outSw&1);
-		if (outSw < 0)
-			return throwError("invalid swizzling mask: %s\n", dotPos);
-	}
 	int regOffset = 0;
 	char* offPos = strchr(pos, '[');
+	char* dotPos = pos;
 	if (offPos)
 	{
-		char* closePos = strchr(offPos, ']');
-		if (!closePos)
+		dotPos = strchr(offPos, ']');
+		if (!pos)
 			return throwError("missing closing bracket: %s\n", pos);
-		*closePos = 0;
+		*dotPos++ = 0;
 		*offPos++ = 0;
 		offPos = trim_whitespace(offPos);
 
@@ -730,6 +723,14 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 		regOffset = atoi(offPos);
 		if (regOffset < 0)
 			return throwError("invalid register offset: %s\n", offPos);
+	}
+	dotPos = strchr(dotPos, '.');
+	if (dotPos)
+	{
+		*dotPos++ = 0;
+		outSw = parseSwizzling(dotPos) | (outSw&1);
+		if (outSw < 0)
+			return throwError("invalid swizzling mask: %s\n", dotPos);
 	}
 	aliasTableIter it = g_aliases.find(pos);
 	if (it != g_aliases.end())
@@ -1016,9 +1017,9 @@ DEF_COMMAND(formatmova)
 	ENSURE_NO_MORE_ARGS();
 
 	int mask;
-	if      (strcmp(targetReg, "a0")==0)  mask = BIT(3);
-	else if (strcmp(targetReg, "a1")==0)  mask = BIT(2);
-	else if (strcmp(targetReg, "a01")==0) mask = BIT(3) | BIT(2);
+	if      (stricmp(targetReg, "a0")==0  || stricmp(targetReg, "a0.x")==0)  mask = BIT(3);
+	else if (stricmp(targetReg, "a1")==0  || stricmp(targetReg, "a0.y")==0)  mask = BIT(2);
+	else if (stricmp(targetReg, "a01")==0 || stricmp(targetReg, "a0.xy")==0) mask = BIT(3) | BIT(2);
 	else return throwError("invalid destination register for mova: %s\n", targetReg);
 
 	ARG_TO_SRC1_REG2(rSrc1, src1Name);

@@ -51,7 +51,7 @@ Registers may also be assigned additional names in order to make the code more l
 
 For convenience, registers may be addressed using an offset from a known register. This is called indexing. For example, `c8[4]` is equivalent to `c12`; and `r4[-2]` is equivalent to `r2`. Indexing is useful for addressing arrays of registers (such as matrices).
 
-Some source operands of instructions (called SRC1) support relative addressing. This means that it is possible to use one of the three built-in indexing registers (`a0`, `a1` and `a2` aka `lcnt`) to address a register, e.g. `someArray[lcnt]`. Adding an offset is also supported, e.g. `someArray[lcnt+2]`. This is useful in FOR loops. Index registers can only be used with floating-point vector uniform registers, though.
+Some source operands of instructions (called SRC1) support relative addressing. This means that it is possible to use one of the three built-in indexing registers (`a0.x`, `a0.y` and `lcnt`) to address a register, e.g. `someArray[lcnt]`. Adding an offset is also supported, e.g. `someArray[lcnt+2]`. This is useful in FOR loops. Index registers can only be used with floating-point vector uniform registers, though. Note: Older versions of `picasso` called these registers `a0`, `a1` and `a2`; these names are still accepted for backwards compatibility.
 
 Normal floating-point vector registers may also be negated by prepending a minus sign before it, e.g. `-r2` or `-someArray[lcnt+2]`.
 
@@ -339,7 +339,7 @@ Syntax                            | Description
 	- In instructions that take two source operands, the first is wide and the second is narrow.
 	- `dph`/`sge`/`slt` have a special form where the first operand is narrow and the second is wide. This usage is detected automatically by `picasso`.
 	- `mad`, which takes three source operands, has two forms: the first is narrow-wide-narrow, and the second is narrow-narrow-wide. This is also detected automatically.
-- `idxReg`: Represents an indexing register to write to using the mova instruction. Can be `a0`, `a1` or `a01` (the latter writes to both `a0` and `a1`).
+- `idxReg`: Represents an indexing register to write to using the mova instruction. Can be `a0.x`, `a0.y` or `a0.xy` (the latter writes to both components). Note: Older versions of `picasso` accepted `a0`, `a1` and `a01` respectively; this syntax is still supported for backwards compatibility.
 - `iReg`: Represents an integer vector uniform source operand.
 - `bReg`: Represents a boolean uniform source operand.
 - `procName`: Represents the name of a procedure.
