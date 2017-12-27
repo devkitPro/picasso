@@ -786,6 +786,8 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 				return throwError("invalid boolean uniform register: %s\n", pos);
 			break;
 	}
+	if (idxType && *idxType && outReg < 0x20 || outReg >= 0x80)
+		return throwError("index register not allowed with this kind of register\n");
 	outReg += regOffset;
 	return 0;
 }
