@@ -7,7 +7,7 @@
 uint32_t f32tof24(float f)
 {
 	uint32_t i;
-	std::memcpy(&i, &f, sizeof(f));
+	memcpy(&i, &f, sizeof(f));
 
 	uint32_t mantissa = (i << 9) >>  9;
 	int32_t  exponent = (i << 1) >> 24;
