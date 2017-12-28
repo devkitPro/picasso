@@ -524,7 +524,7 @@ static inline int ensure_valid_condop(int condop, const char* name)
 static int parseSwizzling(const char* b)
 {
 	int i, out = 0, q = COMP_X;
-	for (i = 0; b[i] && i < 4; i ++)
+	for (i = 0; i < 4 && b[i]; i ++)
 	{
 		switch (tolower(b[i]))
 		{
