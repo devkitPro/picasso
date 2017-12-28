@@ -1755,7 +1755,7 @@ DEF_DIRECTIVE(setfi)
 	return 0;
 }
 
-int parseBool(bool& out, const char* text)
+static int parseBool(bool& out, const char* text)
 {
 	if (stricmp(text, "true")==0 || stricmp(text, "on")==0 || stricmp(text, "1")==0)
 	{
