@@ -226,8 +226,8 @@ struct DVLEData
 	u32 outputUsedReg;
 	int outputCount;
 
-	bool usesGshSpace() { return isGeoShader && !isCompatGeoShader; }
-	int findFreeOutput()
+	bool usesGshSpace() const { return isGeoShader && !isCompatGeoShader; }
+	int findFreeOutput() const
 	{
 		for (int i = 0; i < maxOutputReg(); i ++)
 			if (!(outputMask & BIT(i)))
@@ -235,7 +235,7 @@ struct DVLEData
 		return -1;
 	}
 
-	int findFreeInput()
+	int findFreeInput() const
 	{
 		for (int i = 0; i < 16; i ++)
 			if (!(inputMask & BIT(i)))

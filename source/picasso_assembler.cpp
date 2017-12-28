@@ -81,7 +81,7 @@ struct UniformAllocBundle
 
 static UniformAllocBundle unifAlloc[2];
 
-static inline UniformAlloc& getAlloc(int type, DVLEData* dvle)
+static inline UniformAlloc& getAlloc(int type, const DVLEData* dvle)
 {
 	int x = dvle->usesGshSpace();
 	switch (type)
