@@ -1,19 +1,13 @@
 #include "picasso.h"
 
-static inline uint32_t floatrawbits(float f)
-{
-	union { float f; uint32_t i; } s;
-	s.f = f;
-	return s.i;
-}
-
 // f24 has:
 //  - 1 sign bit
 //  - 7 exponent bits
 //  - 16 mantissa bits
 uint32_t f32tof24(float f)
 {
-	uint32_t i = floatrawbits(f);
+	uint32_t i;
+	std::memcpy(&i, &f, sizeof(f));
 
 	uint32_t mantissa = (i << 9) >>  9;
 	int32_t  exponent = (i << 1) >> 24;
