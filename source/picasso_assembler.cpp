@@ -692,7 +692,7 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 	if (offPos)
 	{
 		dotPos = strchr(offPos, ']');
-		if (!pos)
+		if (!dotPos)
 			return throwError("missing closing bracket: %s\n", pos);
 		*dotPos++ = 0;
 		*offPos++ = 0;
