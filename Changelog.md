@@ -1,5 +1,12 @@
 # picasso Changelog
 
+# v2.7
+
+- Added `dst`, `litp` and `break` instructions (thanks to @Tilka).
+- Added check to enforce index regs being used only with floating point vector uniforms.
+- Renamed index registers to match D3D naming conventions (`a0.x`, `a0.y`, `aL`) (old names still accepted).
+- Miscellaneous bugfixes and improvements (thanks to @lioncash).
+
 # v2.6.2
 
 - Fixed several compilation errors in some compilers.
