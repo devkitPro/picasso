@@ -716,7 +716,7 @@ static int parseReg(char* pos, int& outReg, int& outSw, int* idxType = NULL)
 			char* idxRegName = trim_whitespace(offPos);
 			offPos = trim_whitespace(plusPos);
 			*idxType = convertIdxRegName(idxRegName);
-			if (*idxType < 0)
+			if (!*idxType)
 				return throwError("invalid index register: %s\n", idxRegName);
 		} while (0);
 
