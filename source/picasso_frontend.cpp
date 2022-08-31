@@ -206,7 +206,6 @@ int main(int argc, char* argv[])
 		f.WriteWord(dvle->uniformCount); // size of uniform table
 		curOff += dvle->uniformCount*8;
 		f.WriteWord(curOff); // offset to symbol table
-		u32 temp = f.Tell();
 		f.WriteWord(dvle->symbolSize); // size of symbol table
 
 		// Sort uniforms by position
