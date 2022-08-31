@@ -1834,7 +1834,7 @@ DEF_DIRECTIVE(in)
 	{
 		ARG_TO_REG(inReg, inRegName);
 		if (inReg < 0x00 || inReg >= 0x10)
-			return throwError("invalid input register: %s\n", inReg);
+			return throwError("invalid input register: %s\n", inRegName);
 		oid = inReg;
 	} else
 		oid = dvle->findFreeInput();
