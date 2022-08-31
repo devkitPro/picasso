@@ -1371,7 +1371,7 @@ DEF_DIRECTIVE(end)
 		lastWasEnd = false;
 	}
 
-	else if (elem.type == SE_PROC || elem.type == SE_FOR || (elem.type == SE_IF && BUF.size() > 0))
+	else if ((elem.type == SE_PROC || elem.type == SE_FOR || elem.type == SE_IF) && BUF.size() > 0)
 	{
 		u32 p = BUF.size();
 		u32 lastOpcode = BUF[p-1] >> 26;
