@@ -1,5 +1,9 @@
 # picasso Changelog
 
+# v2.7.1
+
+- Further improvements to overall system stability and other minor adjustments have been made to enhance the user experience.
+
 # v2.7
 
 - Added `dst`, `litp` and `break` instructions (thanks to @Tilka).
