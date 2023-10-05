@@ -548,9 +548,13 @@ static int maskFromSwizzling(int sw, bool reverse = true)
 {
 	sw >>= 1; // get rid of negation bit
 	int out = 0;
+	int prevbitid = 4;
 	for (int i = 0; i < 4; i ++)
 	{
 		int bitid = (sw>>(i*2))&3;
+		if (bitid > prevbitid)
+			fprintf(stderr, "%s:%d: warning: arbitrary swizzling has no effect for destination mask\n", curFile, curLine);
+		prevbitid=bitid;
 		if (reverse) bitid = 3 - bitid;
 		out |= BIT(bitid);
 	}
