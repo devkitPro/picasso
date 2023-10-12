@@ -29,3 +29,5 @@ Makefile
 picasso
 .deps/
 *.bz2
+
+build/

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.0)
+project (picasso VERSION 2.7.1)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin) 
+add_library(picasso source/picasso_assembler.cpp)
+add_executable(picasso_frontend source/picasso_frontend.cpp)
+target_link_libraries(picasso_frontend picasso)
+add_compile_definitions(PACKAGE_STRING="${PROJECT_NAME} ${PROJECT_VERSION}")
+set_target_properties(picasso_frontend PROPERTIES OUTPUT_NAME "${PROJECT_NAME}")
